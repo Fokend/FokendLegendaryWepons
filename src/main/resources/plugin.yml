@@ -1,0 +1,24 @@
+name: FokendLegendaryWepons
+version: '${version}'
+main: FuckFokend.fokendLegendaryWepons.FokendLegendaryWepons
+api-version: '1.21.11'
+authors: [ Fokend ]
+description: Легендарное оружие для SMP
+
+commands:
+  legendary:
+    description: Выдача легендарного оружия и управление состояниями
+    usage: /legendary <id|fix|clearsouls|resetcrafts>
+    permission: legendary.admin
+  revive:
+    description: Возродить игрока с похищенной душой за 5 сердец
+    usage: /revive <ник>
+    permission: legendary.revive
+
+permissions:
+  legendary.admin:
+    description: Полный доступ к команде /legendary
+    default: op
+  legendary.revive:
+    description: Право возрождать бездушных игроков командой /revive
+    default: true
