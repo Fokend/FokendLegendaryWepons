@@ -1,9 +1,9 @@
 name: FokendLegendaryWepons
-version: '${version}'
+version: '1.0-SNAPSHOT'
 main: FuckFokend.fokendLegendaryWepons.FokendLegendaryWepons
 api-version: '1.21.11'
 authors: [ Fokend ]
-description: Легендарное оружие для SMP
+description: Легендарное оружие и ядра SMP
 
 commands:
   legendary:
@@ -11,14 +11,27 @@ commands:
     usage: /legendary <id|fix|clearsouls|resetcrafts>
     permission: legendary.admin
   revive:
-    description: Возродить игрока с похищенной душой за 5 сердец
+    description: Возродить игрока и очистить бездушие за 5 сердец
     usage: /revive <ник>
     permission: legendary.revive
+  godeye:
+    description: Тетрадь Смерти - отдать 5 сердец, чтобы видеть невидимок
+    usage: /godeye
+  refusenote:
+    description: Тетрадь Смерти - отказаться от тетради
+    usage: /refusenote
+  check:
+    description: Тетрадь Смерти - угадать владельца
+    usage: /check <ник>
+  dnunlock:
+    description: Снять вечный режим приключений
+    usage: /dnunlock <ник>
+    permission: legendary.admin
 
 permissions:
   legendary.admin:
-    description: Полный доступ к команде /legendary
+    description: Доступ к командам /legendary и /dnunlock
     default: op
   legendary.revive:
-    description: Право возрождать бездушных игроков командой /revive
+    description: Право возрождать игроков через /revive
     default: true

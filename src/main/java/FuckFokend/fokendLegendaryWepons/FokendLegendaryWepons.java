@@ -178,7 +178,7 @@ public final class FokendLegendaryWepons extends JavaPlugin {
     static final List<String> RECIPE_KEYS = List.of(
             "cb_orange", "cb_purple", "cb_green", "time_clock", "ice_spear",
             "default_mask", "warden_helmet", "ra_blade", "chaos_boomerang",
-            "twins_sword", "magnet", "happy_mask"
+            "twins_sword", "magnet", "happy_mask", "death_note", "fate_scales"
     );
 
     public FokendLegendaryWepons() {
@@ -214,6 +214,8 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         pm.registerEvents(new CoreUpgradeListener(this), this);
         pm.registerEvents(new ItemProtectionListener(this), this);
         pm.registerEvents(new EntityRightClickBridge(this), this);
+        pm.registerEvents(new DeathNoteListener(this), this);
+        pm.registerEvents(new ScalesOfFateListener(this), this);
 
         PluginCommand legendaryCmd = this.getCommand("legendary");
         final LegendaryCommand legendaryExec = new LegendaryCommand();
@@ -2062,6 +2064,30 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         rHappy.setIngredient('D', Material.NETHERITE_INGOT);
         rHappy.setIngredient('S', cOrange);
         this.getServer().addRecipe(rHappy);
+
+        NamespacedKey kDeath = new NamespacedKey(this, "death_note");
+        this.getServer().removeRecipe(kDeath);
+        ShapedRecipe rDeath = new ShapedRecipe(kDeath, DeathNoteListener.create(this));
+        rDeath.shape("SWS", "NPN", "COC");
+        rDeath.setIngredient('S', Material.WITHER_SKELETON_SKULL);
+        rDeath.setIngredient('W', Material.WRITABLE_BOOK);
+        rDeath.setIngredient('N', Material.NETHERITE_INGOT);
+        rDeath.setIngredient('P', cPurple);
+        rDeath.setIngredient('C', Material.CRYING_OBSIDIAN);
+        rDeath.setIngredient('O', cOrange);
+        this.getServer().addRecipe(rDeath);
+
+        NamespacedKey kScales = new NamespacedKey(this, "fate_scales");
+        this.getServer().removeRecipe(kScales);
+        ShapedRecipe rScales = new ShapedRecipe(kScales, ScalesOfFateListener.createScales(this));
+        rScales.shape("GNG", "PSA", "GTG");
+        rScales.setIngredient('G', Material.GOLD_BLOCK);
+        rScales.setIngredient('N', Material.NETHER_STAR);
+        rScales.setIngredient('P', cPurple);
+        rScales.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
+        rScales.setIngredient('A', cOrange);
+        rScales.setIngredient('T', Material.TOTEM_OF_UNDYING);
+        this.getServer().addRecipe(rScales);
     }
 
     static record ThrownBoomerang(UUID owner, ItemStack item, String throwSessionId) {
@@ -2100,6 +2126,7 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                 "warden_helmet", "twins_sword", "magnet", "time_clock", "ice_spear",
                 "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
                 "mask_block", "mask_mace", "mask_tompson", "soul_bow",
+                "death_note", "fate_scales", "fate_lightning",
                 "fix", "clearsouls", "resetcrafts"
         );
 
@@ -2215,6 +2242,9 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                 case "mask_mace" -> FokendLegendaryWepons.this.maskMace();
                 case "mask_tompson", "thompson" -> FokendLegendaryWepons.this.maskThompson();
                 case "soul_bow", "bow" -> FokendLegendaryWepons.this.soulBow();
+                case "death_note", "deathnote" -> DeathNoteListener.create(FokendLegendaryWepons.this);
+                case "fate_scales", "scales_of_fate", "scales" -> ScalesOfFateListener.createScales(FokendLegendaryWepons.this);
+                case "fate_lightning", "lightning" -> ScalesOfFateListener.createLightning(FokendLegendaryWepons.this);
                 default -> null;
             };
             if (item == null) {
