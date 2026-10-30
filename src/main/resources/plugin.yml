@@ -8,12 +8,8 @@ description: Легендарное оружие и ядра SMP
 commands:
   legendary:
     description: Выдача легендарного оружия и управление состояниями
-    usage: /legendary <id|fix|clearsouls|resetcrafts>
+    usage: /legendary <id|resetcrafts>
     permission: legendary.admin
-  revive:
-    description: Возродить игрока и очистить бездушие за 5 сердец
-    usage: /revive <ник>
-    permission: legendary.revive
   godeye:
     description: Тетрадь Смерти - отдать 5 сердец, чтобы видеть невидимок
     usage: /godeye
@@ -32,6 +28,3 @@ permissions:
   legendary.admin:
     description: Доступ к командам /legendary и /dnunlock
     default: op
-  legendary.revive:
-    description: Право возрождать игроков через /revive
-    default: true

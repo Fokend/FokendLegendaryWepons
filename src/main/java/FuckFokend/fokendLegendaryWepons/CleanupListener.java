@@ -72,7 +72,6 @@ final class CleanupListener implements Listener {
         plugin.fallingFree.remove(id);
         plugin.lastY.remove(id);
         plugin.setRunBoost(p, false);
-        WardenHelmetListener.syncWardenHealthAttribute(plugin, p, false);
         plugin.maskSneakStart.remove(id);
         plugin.maskRunUntil.remove(id);
         if (plugin.wardenBlindness.remove(id)) {
@@ -93,7 +92,6 @@ final class CleanupListener implements Listener {
         plugin.setRunBoost(p, false);
         plugin.maskSneakStart.remove(id);
         plugin.maskRunUntil.remove(id);
-        WardenHelmetListener.syncWardenHealthAttribute(plugin, p, false);
 
         UUID dollId = plugin.raDolls.remove(id);
         if (dollId != null) {
@@ -177,8 +175,6 @@ final class CleanupListener implements Listener {
     public void onRespawn(PlayerRespawnEvent e) {
         Player p = e.getPlayer();
         p.setGravity(true);
-        boolean wearingWarden = plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET);
-        WardenHelmetListener.syncWardenHealthAttribute(plugin, p, wearingWarden);
     }
 
     @EventHandler
@@ -186,8 +182,6 @@ final class CleanupListener implements Listener {
         Player p = e.getPlayer();
         p.setGravity(true);
         plugin.setRunBoost(p, false);
-        boolean wearingWarden = plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET);
-        WardenHelmetListener.syncWardenHealthAttribute(plugin, p, wearingWarden);
         for (String k : plugin.RECIPE_KEYS) {
             if (!plugin.craftedUniques.contains(k)) {
                 p.discoverRecipe(new NamespacedKey(plugin, k));
