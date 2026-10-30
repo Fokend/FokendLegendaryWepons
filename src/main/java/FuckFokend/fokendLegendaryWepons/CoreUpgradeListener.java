@@ -3,9 +3,9 @@ package FuckFokend.fokendLegendaryWepons;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.WeakHashMap;
-import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -22,7 +22,9 @@ final class CoreUpgradeListener implements Listener {
     private final FokendLegendaryWepons plugin;
     private final Map<AnvilInventory, Plan> plans = new WeakHashMap<>();
 
-    private record Plan(int signature, ItemStack result, boolean success, Enchantment enchantment) {}
+    private record Plan(ItemStack first, ItemStack second, int targetSlot, int coreSlot,
+                        double chance, Outcome outcome) {}
+    private record Outcome(ItemStack result, boolean success, boolean broken, Enchantment enchantment) {}
 
     CoreUpgradeListener(FokendLegendaryWepons plugin) {
         this.plugin = plugin;
@@ -37,12 +39,18 @@ final class CoreUpgradeListener implements Listener {
         String secondId = plugin.getId(second);
         ItemStack target;
         String coreId;
+        int targetSlot;
+        int coreSlot;
         if (plugin.isCraftingCore(secondId)) {
             target = first;
             coreId = secondId;
+            targetSlot = 0;
+            coreSlot = 1;
         } else if (plugin.isCraftingCore(firstId)) {
             target = second;
             coreId = firstId;
+            targetSlot = 1;
+            coreSlot = 0;
         } else {
             plans.remove(inventory);
             return;
@@ -54,74 +62,142 @@ final class CoreUpgradeListener implements Listener {
             return;
         }
 
-        int signature = 31 * (first == null ? 0 : first.hashCode()) + (second == null ? 0 : second.hashCode());
         Plan plan = plans.get(inventory);
-        if (plan == null || plan.signature() != signature) {
-            plan = createPlan(signature, target, coreId);
-            if (plan == null) {
-                plans.remove(inventory);
-                event.setResult(null);
-                return;
-            }
+        if (plan == null || !sameInputs(plan, first, second)) {
+            plan = new Plan(copy(first), copy(second), targetSlot, coreSlot, chanceFor(coreId), null);
             plans.put(inventory, plan);
         }
-        event.setResult(plan.result().clone());
+
+        // Keep the preview neutral. The random roll happens only when the player takes the result.
+        ItemStack preview = target.clone();
+        preview.setAmount(1);
+        event.setResult(preview);
         event.getView().setRepairCost(1);
         event.getView().setMaximumRepairCost(40);
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onTakeResult(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player) || event.getRawSlot() != 2
-                || !(event.getInventory() instanceof AnvilInventory inventory)) return;
+                || !(event.getView().getTopInventory() instanceof AnvilInventory inventory)) return;
         Plan plan = plans.get(inventory);
-        if (plan == null) return;
-        if (plan.success()) {
-            player.sendMessage("§aЯдро усилило зачарование " + plan.enchantment().getKey().getKey() + " на 1 уровень.");
+        if (plan == null || !sameInputs(plan, inventory.getFirstItem(), inventory.getSecondItem())) return;
+        event.setCancelled(true);
+
+        int cost = event.getView() instanceof org.bukkit.inventory.view.AnvilView view ? view.getRepairCost() : 1;
+        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE && player.getLevel() < cost) {
+            player.sendMessage("§cДля обработки ядра нужен как минимум 1 уровень опыта.");
+            return;
+        }
+        // Require output space before rolling, so a full inventory cannot be used to reroll attempts.
+        if (!hasOutputSpace(player, event)) {
+            player.sendMessage("§cОсвободи место в инвентаре (или на курсоре), чтобы обработать ядро.");
+            return;
+        }
+
+        Outcome outcome = plan.outcome();
+        if (outcome == null) {
+            outcome = rollOutcome(plan);
+            plan = new Plan(plan.first(), plan.second(), plan.targetSlot(), plan.coreSlot(), plan.chance(), outcome);
+            plans.put(inventory, plan);
+        }
+        if (!outcome.broken() && !storeOutput(player, event, outcome.result().clone())) {
+            player.sendMessage("§cОсвободи место в инвентаре, чтобы забрать результат.");
+            return;
+        }
+
+        consumeOne(inventory, plan.targetSlot());
+        consumeOne(inventory, plan.coreSlot());
+        inventory.setItem(2, null);
+        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) player.setLevel(player.getLevel() - cost);
+        plans.remove(inventory);
+
+        if (outcome.broken()) {
+            player.sendMessage("§cЯдро не сработало: предмет разрушен из-за потери прочности.");
+        } else if (outcome.success()) {
+            player.sendMessage("§aЯдро усилило зачарование " + outcome.enchantment().getKey().getKey() + " на 1 уровень.");
         } else {
             player.sendMessage("§cЯдро не сработало: предмет потерял 80% оставшейся прочности.");
         }
+        player.updateInventory();
     }
 
-    private Plan createPlan(int signature, ItemStack target, String coreId) {
+    private Outcome rollOutcome(Plan plan) {
+        ItemStack target = plan.targetSlot() == 0 ? plan.first() : plan.second();
         ItemMeta meta = target.getItemMeta();
-        if (meta == null) return null;
-        List<Enchantment> upgradable = new ArrayList<>();
+        List<Enchantment> enchants = new ArrayList<>();
         for (Map.Entry<Enchantment, Integer> entry : meta.getEnchants().entrySet()) {
-            if (entry.getValue() < entry.getKey().getMaxLevel()) upgradable.add(entry.getKey());
+            // Deliberately ignore vanilla max levels: each core adds exactly one level.
+            if (entry.getValue() < Integer.MAX_VALUE) enchants.add(entry.getKey());
         }
-        if (upgradable.isEmpty()) return null;
+        if (enchants.isEmpty()) return new Outcome(target.clone(), false, false, null);
 
-        double chance = switch (coreId) {
+        if (RANDOM.nextDouble() < plan.chance()) {
+            Enchantment selected = enchants.get(RANDOM.nextInt(enchants.size()));
+            ItemStack upgraded = target.clone();
+            upgraded.setAmount(1);
+            ItemMeta upgradedMeta = upgraded.getItemMeta();
+            upgradedMeta.addEnchant(selected, meta.getEnchantLevel(selected) + 1, true);
+            upgraded.setItemMeta(upgradedMeta);
+            return new Outcome(upgraded, true, false, selected);
+        }
+
+        int maxDurability = target.getType().getMaxDurability();
+        int currentDamage = ((Damageable) meta).getDamage();
+        int remaining = maxDurability - currentDamage;
+        int damageAfter = currentDamage + (int) Math.ceil(remaining * 0.80D);
+        boolean broken = damageAfter >= maxDurability;
+        ItemStack damaged = target.clone();
+        damaged.setAmount(1);
+        Damageable damagedMeta = (Damageable) damaged.getItemMeta();
+        damagedMeta.setDamage(Math.min(maxDurability, damageAfter));
+        damaged.setItemMeta((ItemMeta) damagedMeta);
+        return new Outcome(damaged, false, broken, null);
+    }
+
+    private double chanceFor(String coreId) {
+        return switch (coreId) {
             case FokendLegendaryWepons.ID_CB_ORANGE -> 0.10D;
             case FokendLegendaryWepons.ID_CB_PURPLE -> 0.15D;
             case FokendLegendaryWepons.ID_CB_GREEN -> 0.17D;
             default -> 0.0D;
         };
-        boolean success = RANDOM.nextDouble() < chance;
-        ItemStack result = target.clone();
-        Enchantment selected = null;
-        if (success) {
-            selected = upgradable.get(RANDOM.nextInt(upgradable.size()));
-            ItemMeta resultMeta = result.getItemMeta();
-            resultMeta.addEnchant(selected, meta.getEnchantLevel(selected) + 1, true);
-            result.setItemMeta(resultMeta);
-        } else if (meta instanceof Damageable damageable) {
-            int maxDurability = target.getType().getMaxDurability();
-            int currentDamage = damageable.getDamage();
-            int remaining = maxDurability - currentDamage;
-            if (maxDurability <= 0 || remaining <= 0) return null;
-            int remainingAfter = Math.max(1, (int) Math.round(remaining * 0.20D));
-            Damageable resultDamage = (Damageable) result.getItemMeta();
-            resultDamage.setDamage(maxDurability - remainingAfter);
-            result.setItemMeta((ItemMeta) resultDamage);
-        }
-        return new Plan(signature, result, success, selected);
     }
 
     private boolean isSupportedTarget(ItemStack item) {
-        if (item == null || item.getType().isAir() || plugin.getId(item) != null) return false;
+        if (item == null || item.getType().isAir()) return false;
         if (item.getType().getMaxDurability() <= 0 || !(item.getItemMeta() instanceof Damageable)) return false;
         return !item.getEnchantments().isEmpty();
+    }
+
+    private boolean sameInputs(Plan plan, ItemStack first, ItemStack second) {
+        return Objects.equals(plan.first(), first) && Objects.equals(plan.second(), second);
+    }
+
+    private ItemStack copy(ItemStack item) {
+        return item == null ? null : item.clone();
+    }
+
+    private boolean hasOutputSpace(Player player, InventoryClickEvent event) {
+        if (event.isShiftClick()) return player.getInventory().firstEmpty() != -1;
+        ItemStack cursor = event.getCursor();
+        return cursor == null || cursor.getType().isAir();
+    }
+
+    private boolean storeOutput(Player player, InventoryClickEvent event, ItemStack output) {
+        if (event.isShiftClick()) return player.getInventory().addItem(output).isEmpty();
+        ItemStack cursor = event.getCursor();
+        if (cursor == null || cursor.getType().isAir()) {
+            event.getView().setCursor(output);
+            return true;
+        }
+        return false;
+    }
+
+    private void consumeOne(AnvilInventory inventory, int slot) {
+        ItemStack item = inventory.getItem(slot);
+        if (item == null || item.getType().isAir()) return;
+        if (item.getAmount() <= 1) inventory.setItem(slot, null);
+        else item.setAmount(item.getAmount() - 1);
     }
 }
