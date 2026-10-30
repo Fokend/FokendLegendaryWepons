@@ -351,9 +351,16 @@ final class DeathNoteListener implements Listener {
     }
 
     private void lockAndKill(UUID id, String reason) {
+        Player v = this.plugin.getServer().getPlayer(id);
+        if (v != null && (v.isOp() || v.hasPermission("legendary.admin"))) {
+            // Admins / OPs die from the penalty, but are NOT locked in adventure mode!
+            this.adventureLocked.remove(id);
+            this.save();
+            this.killPlayer(v, reason);
+            return;
+        }
         this.adventureLocked.add(id);
         this.save();
-        Player v = this.plugin.getServer().getPlayer(id);
         if (v != null && v.isOnline() && !v.isDead() && v.isValid()) {
             v.setGameMode(GameMode.ADVENTURE);
             this.killPlayer(v, reason);
@@ -366,16 +373,18 @@ final class DeathNoteListener implements Listener {
             return true;
         }
         if (args.length < 1) {
-            sender.sendMessage("/dnunlock <ник>");
+            sender.sendMessage(red("Использование: /dnunlock <ник>"));
             return true;
         }
         OfflinePlayer op = this.plugin.getServer().getOfflinePlayer(args[0]);
-        if (this.adventureLocked.remove(op.getUniqueId())) {
-            this.save();
-            sender.sendMessage("Режим приключений снят с " + args[0]);
-        } else {
-            sender.sendMessage("У игрока нет блокировки.");
+        this.adventureLocked.remove(op.getUniqueId());
+        this.save();
+        Player online = op.isOnline() ? op.getPlayer() : null;
+        if (online != null) {
+            online.setGameMode(GameMode.SURVIVAL);
+            online.sendMessage(Component.text("Блокировка режима приключений снята!", NamedTextColor.GREEN));
         }
+        sender.sendMessage(Component.text("Режим приключений снят с " + args[0] + " (переведён в выживание).", NamedTextColor.GREEN));
         return true;
     }
 
@@ -749,16 +758,40 @@ final class DeathNoteListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onGameMode(PlayerGameModeChangeEvent e) {
-        if (this.adventureLocked.contains(e.getPlayer().getUniqueId()) && e.getNewGameMode() != GameMode.ADVENTURE) {
-            e.setCancelled(true);
+        Player p = e.getPlayer();
+        if (!this.adventureLocked.contains(p.getUniqueId())) return;
+        if (e.getNewGameMode() == GameMode.ADVENTURE) return;
+
+        // 1. If player is OP or admin, never lock them out and clean up lock:
+        if (p.isOp() || p.hasPermission("legendary.admin")) {
+            this.adventureLocked.remove(p.getUniqueId());
+            this.save();
+            return;
         }
+
+        // 2. If gamemode was changed by command (Console or admin) or plugin, unlock them:
+        if (e.getCause() == PlayerGameModeChangeEvent.Cause.COMMAND || e.getCause() == PlayerGameModeChangeEvent.Cause.PLUGIN) {
+            this.adventureLocked.remove(p.getUniqueId());
+            this.save();
+            p.sendMessage(Component.text("Ваш режим приключений снят администратором.", NamedTextColor.GREEN));
+            return;
+        }
+
+        // 3. Otherwise block unauthorized self-change:
+        e.setCancelled(true);
+        p.sendMessage(red("Вы заблокированы в режиме приключений Тетрадью Смерти!"));
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         if (this.adventureLocked.contains(p.getUniqueId())) {
-            p.setGameMode(GameMode.ADVENTURE);
+            if (p.isOp() || p.hasPermission("legendary.admin")) {
+                this.adventureLocked.remove(p.getUniqueId());
+                this.save();
+            } else {
+                p.setGameMode(GameMode.ADVENTURE);
+            }
         }
         if (!this.owners.contains(p.getUniqueId())) {
             this.removeGodEye(p);
@@ -769,7 +802,12 @@ final class DeathNoteListener implements Listener {
     public void onRespawn(PlayerRespawnEvent e) {
         Player p = e.getPlayer();
         if (this.adventureLocked.contains(p.getUniqueId())) {
-            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> p.setGameMode(GameMode.ADVENTURE));
+            if (p.isOp() || p.hasPermission("legendary.admin")) {
+                this.adventureLocked.remove(p.getUniqueId());
+                this.save();
+            } else {
+                this.plugin.getServer().getScheduler().runTask(this.plugin, () -> p.setGameMode(GameMode.ADVENTURE));
+            }
         }
     }
 
@@ -816,7 +854,12 @@ final class DeathNoteListener implements Listener {
                         DeathNoteListener.this.scrambled.remove(p.getUniqueId());
                     }
                     if (DeathNoteListener.this.adventureLocked.contains(p.getUniqueId()) && p.getGameMode() != GameMode.ADVENTURE) {
-                        p.setGameMode(GameMode.ADVENTURE);
+                        if (p.isOp() || p.hasPermission("legendary.admin")) {
+                            DeathNoteListener.this.adventureLocked.remove(p.getUniqueId());
+                            DeathNoteListener.this.save();
+                        } else {
+                            p.setGameMode(GameMode.ADVENTURE);
+                        }
                     }
                 }
             }
