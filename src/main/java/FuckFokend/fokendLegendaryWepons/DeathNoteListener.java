@@ -42,6 +42,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerEditBookEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
@@ -76,7 +77,11 @@ final class DeathNoteListener implements Listener {
 
     private final Set<UUID> owners = ConcurrentHashMap.newKeySet();
     private final Set<UUID> adventureLocked = ConcurrentHashMap.newKeySet();
+    // Players whose name is currently ciphered (they have Invisibility). Written on the main thread only,
+    // read by the async chat renderer.
     private final Set<UUID> scrambled = ConcurrentHashMap.newKeySet();
+    // Players with the god-eye attribute modifier. Same threading rules as {@link #scrambled}.
+    private final Set<UUID> godEyeHolders = ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> deathNoteKills = new ConcurrentHashMap<>();
 
     DeathNoteListener(FokendLegendaryWepons plugin) {
@@ -220,6 +225,7 @@ final class DeathNoteListener implements Listener {
                 return true;
             }
             max.addModifier(new AttributeModifier(this.godEyeKey, -10.0D, Operation.ADD_NUMBER, EquipmentSlotGroup.ANY));
+            this.godEyeHolders.add(p.getUniqueId());
             if (p.getHealth() > max.getValue()) {
                 p.setHealth(max.getValue());
             }
@@ -252,6 +258,7 @@ final class DeathNoteListener implements Listener {
                 }
             }
         }
+        this.godEyeHolders.remove(p.getUniqueId());
     }
 
     private boolean refuse(CommandSender sender) {
@@ -376,7 +383,16 @@ final class DeathNoteListener implements Listener {
             sender.sendMessage(red("Использование: /dnunlock <ник>"));
             return true;
         }
-        OfflinePlayer op = this.plugin.getServer().getOfflinePlayer(args[0]);
+        // getOfflinePlayer(String) can block the main thread with a web profile lookup for unknown names;
+        // only online or cached players can be locked, so the cache is enough.
+        OfflinePlayer op = this.plugin.getServer().getPlayerExact(args[0]);
+        if (op == null) {
+            op = this.plugin.getServer().getOfflinePlayerIfCached(args[0]);
+        }
+        if (op == null) {
+            sender.sendMessage(red("Игрок " + args[0] + " не найден."));
+            return true;
+        }
         this.adventureLocked.remove(op.getUniqueId());
         this.save();
         Player online = op.isOnline() ? op.getPlayer() : null;
@@ -721,7 +737,9 @@ final class DeathNoteListener implements Listener {
         Player owner = this.plugin.getServer().getPlayer(ownerId);
 
         if (target.isPlayer()) {
-            Player victim = target.player();
+            // A delayed entry keeps the Player object from the moment of writing; after a relog that object is
+            // stale (isOnline() == false), so look the victim up again by UUID.
+            Player victim = target.player() == null ? null : this.plugin.getServer().getPlayer(target.player().getUniqueId());
             if (victim != null && victim.isOnline() && !victim.isDead() && victim.isValid()) {
                 if (victim.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
                     if (owner != null) {
@@ -814,22 +832,52 @@ final class DeathNoteListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         this.scrambled.remove(e.getPlayer().getUniqueId());
+        this.godEyeHolders.remove(e.getPlayer().getUniqueId());
         e.getPlayer().playerListName(null);
+    }
+
+    // Keep the chat cipher in sync as soon as Invisibility changes instead of waiting for the 10-tick task.
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPotion(EntityPotionEffectEvent e) {
+        if (e.getEntity() instanceof Player p && PotionEffectType.INVISIBILITY.equals(e.getModifiedType())) {
+            final UUID id = p.getUniqueId();
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                Player online = this.plugin.getServer().getPlayer(id);
+                if (online != null) {
+                    this.refreshCipher(online);
+                }
+            });
+        }
+    }
+
+    private void refreshCipher(Player p) {
+        boolean inv = p.hasPotionEffect(PotionEffectType.INVISIBILITY);
+        boolean has = this.scrambled.contains(p.getUniqueId());
+        if (inv && !has) {
+            p.playerListName(DeathNoteListener.cipher(p.getName()));
+            this.scrambled.add(p.getUniqueId());
+        } else if (!inv && has) {
+            p.playerListName(null);
+            this.scrambled.remove(p.getUniqueId());
+        }
     }
 
     private static Component cipher(String name) {
         return Component.text(name).decorate(TextDecoration.OBFUSCATED);
     }
 
+    // AsyncChatEvent and its renderer run off the main thread: only read the thread-safe snapshots here,
+    // never potion effects or attributes of the Player objects.
     @EventHandler(priority = EventPriority.HIGH)
     public void onChat(AsyncChatEvent e) {
         Player src = e.getPlayer();
-        if (src.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+        if (this.scrambled.contains(src.getUniqueId())) {
             e.renderer(new ChatRenderer() {
                 @Override
                 public Component render(Player source, Component sourceDisplayName, Component message, Audience viewer) {
                     Component name = sourceDisplayName;
-                    boolean viewerSeesAll = viewer instanceof Player vp && DeathNoteListener.this.hasGodEye(vp);
+                    boolean viewerSeesAll = viewer instanceof Player vp
+                            && DeathNoteListener.this.godEyeHolders.contains(vp.getUniqueId());
                     if (!viewerSeesAll) {
                         name = DeathNoteListener.cipher(source.getName());
                     }
@@ -844,14 +892,11 @@ final class DeathNoteListener implements Listener {
             @Override
             public void run() {
                 for (Player p : DeathNoteListener.this.plugin.getServer().getOnlinePlayers()) {
-                    boolean inv = p.hasPotionEffect(PotionEffectType.INVISIBILITY);
-                    boolean has = DeathNoteListener.this.scrambled.contains(p.getUniqueId());
-                    if (inv && !has) {
-                        p.playerListName(DeathNoteListener.cipher(p.getName()));
-                        DeathNoteListener.this.scrambled.add(p.getUniqueId());
-                    } else if (!inv && has) {
-                        p.playerListName(null);
-                        DeathNoteListener.this.scrambled.remove(p.getUniqueId());
+                    DeathNoteListener.this.refreshCipher(p);
+                    if (DeathNoteListener.this.hasGodEye(p)) {
+                        DeathNoteListener.this.godEyeHolders.add(p.getUniqueId());
+                    } else {
+                        DeathNoteListener.this.godEyeHolders.remove(p.getUniqueId());
                     }
                     if (DeathNoteListener.this.adventureLocked.contains(p.getUniqueId()) && p.getGameMode() != GameMode.ADVENTURE) {
                         if (p.isOp() || p.hasPermission("legendary.admin")) {

@@ -27,7 +27,9 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -376,12 +378,36 @@ final class ScalesOfFateListener implements Listener {
    public void onClick(InventoryClickEvent e) {
       if (e.getView().getTopInventory().getType() != InventoryType.CRAFTING) {
          boolean involved = this.isLightning(e.getCurrentItem()) || this.isLightning(e.getCursor());
+         // Number keys and the off-hand key move an item that is neither the cursor nor the clicked slot.
+         if (!involved && e.getClick() == ClickType.NUMBER_KEY && e.getHotbarButton() >= 0) {
+            involved = this.isLightning(e.getWhoClicked().getInventory().getItem(e.getHotbarButton()));
+         }
+         if (!involved && e.getClick() == ClickType.SWAP_OFFHAND) {
+            involved = this.isLightning(e.getWhoClicked().getInventory().getItemInOffHand());
+         }
          if (involved) {
             boolean topClicked = e.getClickedInventory() != null && e.getClickedInventory().equals(e.getView().getTopInventory());
             if (topClicked || e.isShiftClick()) {
                e.setCancelled(true);
             }
 
+         }
+      }
+   }
+
+   // Dragging the item across slots of an open container would also move it out of the player inventory,
+   // where the expiry task can no longer remove it.
+   @EventHandler(
+      ignoreCancelled = true
+   )
+   public void onDrag(InventoryDragEvent e) {
+      if (e.getView().getTopInventory().getType() != InventoryType.CRAFTING && this.isLightning(e.getOldCursor())) {
+         int topSize = e.getView().getTopInventory().getSize();
+         for(int raw : e.getRawSlots()) {
+            if (raw < topSize) {
+               e.setCancelled(true);
+               return;
+            }
          }
       }
    }

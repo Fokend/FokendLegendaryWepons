@@ -78,7 +78,7 @@ import org.bukkit.util.Vector;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
-public final class FokendLegendaryWepons extends JavaPlugin {
+public class FokendLegendaryWepons extends JavaPlugin {
     static final String ID_CB_ORANGE = "cb_orange";
     static final String ID_CB_PURPLE = "cb_purple";
     static final String ID_CB_GREEN = "cb_green";
@@ -194,6 +194,9 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         this.frozenKey = new NamespacedKey(this, "time_frozen");
         this.runKey = new NamespacedKey(this, "mask_run");
         this.wardenHpKey = new NamespacedKey(this, "warden_hp");
+        // Loads souls.yml (also holds crafted_uniques) and sets soulFile; without it saveSouls() throws
+        // and the one-craft-per-server limit is lost on restart.
+        this.loadSouls();
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new RaBladeListener(this), this);

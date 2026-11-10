@@ -43,3 +43,12 @@
 - Allowed Sonic Boom clicks from either hand, with same-tick duplicate suppression, so empty-hand air clicks are not rejected by hand filtering.
 # 2026-10-24
 - Added Shift+F as a fallback to activate Warden Helmet Sonic Boom with both hands empty. The normal right-click path and existing cooldown remain unchanged.
+
+## 2026-11-09 (Paper 1.21.11 review)
+
+- Death Note chat cipher no longer reads potion effects or attributes from the async chat thread; it uses main-thread snapshots (invisible players, god-eye holders) refreshed on potion changes and every 10 ticks.
+- Delayed Death Note entries ("Name ticks") look the victim up again by UUID, so they still fire after the victim relogs.
+- `/dnunlock` uses online/cached players only instead of `getOfflinePlayer(String)`, which can block the main thread with a profile lookup.
+- Fate Lightning can no longer be moved into containers with number keys, the off-hand key or dragging (it could escape expiry there).
+- Restored loading of `souls.yml` on enable: it was dropped with the removed weapons, so `crafted_uniques` (one craft per server) was never loaded and every save (craft, shutdown) threw `File cannot be null`.
+- Added MockBukkit unit tests (`gradle test`) and real-server integration tests (`integration-test/`).
