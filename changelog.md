@@ -1,5 +1,13 @@
 # Development Build changelog
 
+## 1.3.0 — 2026-11-17
+
+- Restored the full plugin: Chaos Boomerang, Warden Helmet, Magnet, Time Clock, Soul Bow, Default Mask, Thompson and Freeze are back (they were removed in 610ee83). The source now matches the jar running on the server (FokendLegendaryWepons-all-weapons-fixed.jar).
+- Kept all later fixes: /check lock, souls.yml loading, Death Note async chat and relog handling, Fate Lightning inventory containment, and the MockBukkit tests.
+- Warden Helmet: right-click with an item that already has a vanilla use (food, shield, bow, pearls, buckets, armor, tools...) no longer fires the Sonic Boom unless sneaking; Scales of Fate and Death Note are treated as items with their own right-click ability.
+- Version is now 1.3.0 (was 1.0-SNAPSHOT for every build), and startup logs the loaded item set so it is easy to check which build a server runs.
+- Model and texture files are ignored by git: the resource pack is shared with projects privately.
+
 ## 2026-10-19
 
 - Added enchantment cores to the anvil: 10%, 15%, and 17% success rates. A successful attempt raises a random existing enchantment by exactly one level, including beyond vanilla maximum levels.

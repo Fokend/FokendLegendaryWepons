@@ -176,8 +176,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
     NamespacedKey wardenHpKey;
 
     static final List<String> RECIPE_KEYS = List.of(
-            "cb_orange", "cb_purple", "cb_green", "ra_blade", "twins_sword",
-            "ice_spear", "death_note", "fate_scales"
+            "cb_orange", "cb_purple", "cb_green", "time_clock", "ice_spear",
+            "default_mask", "warden_helmet", "ra_blade", "chaos_boomerang",
+            "twins_sword", "magnet", "happy_mask", "death_note", "fate_scales"
     );
 
     public FokendLegendaryWepons() {
@@ -200,8 +201,16 @@ public class FokendLegendaryWepons extends JavaPlugin {
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new RaBladeListener(this), this);
+        pm.registerEvents(new WardenHelmetListener(this), this);
         pm.registerEvents(new IceSpearListener(this), this);
+        pm.registerEvents(new MaskThompsonListener(this), this);
+        pm.registerEvents(new SoulBowListener(this), this);
+        pm.registerEvents(new TimeClockListener(this), this);
+        pm.registerEvents(new FreezeListener(this), this);
+        pm.registerEvents(new ChaosBoomerangListener(this), this);
         pm.registerEvents(new TwinsSwordListener(this), this);
+        pm.registerEvents(new MagnetListener(this), this);
+        pm.registerEvents(new DefaultMaskListener(this), this);
         pm.registerEvents(new CleanupListener(this), this);
         pm.registerEvents(new CraftProtectionListener(this), this);
         pm.registerEvents(new CoreUpgradeListener(this), this);
@@ -219,8 +228,167 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.disableConflictingLegacyPlugins(legendaryExec);
         this.getServer().getScheduler().runTask(this, () -> this.disableConflictingLegacyPlugins(legendaryExec));
 
+        final ReviveCommand reviveExec = new ReviveCommand();
+        PluginCommand reviveCmd = this.getCommand("revive");
+        if (reviveCmd != null) {
+            reviveCmd.setExecutor(reviveExec);
+            reviveCmd.setTabCompleter(reviveExec);
+        } else {
+            Command fallback = new Command("revive") {
+                @Override
+                public boolean execute(CommandSender sender, String label, String[] args) {
+                    return reviveExec.onCommand(sender, this, label, args);
+                }
+
+                @Override
+                public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+                    return reviveExec.onTabComplete(sender, this, alias, args);
+                }
+            };
+            fallback.setDescription("Возродить бездушного игрока (цена: 5 сердец)");
+            fallback.setUsage("/revive <ник>");
+            this.getServer().getCommandMap().register("fokendlegendary", fallback);
+        }
+
         this.registerRecipes();
         this.logRecipes();
+        this.getLogger().info("FokendLegendaryWepons " + this.getPluginMeta().getVersion()
+                + ": 10 легендарок (Клинок Ра, Бумеранг Хаоса, Шлем Вардена, Меч Близнецов, Магнитник,"
+                + " Часы, Морозное копьё, Маска, Томпсон, Лук Душ) + Тетрадь Смерти, Весы Судьбы, 3 ядра.");
+
+        for (World world : this.getServer().getWorlds()) {
+            for (LivingEntity entity : world.getLivingEntities()) {
+                this.restoreStaleFrozen(entity);
+            }
+        }
+
+        // Happy mask passive effects (Warden helmet is handled by WardenHelmetListener's task)
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    if (FokendLegendaryWepons.this.isLegendary(p.getInventory().getHelmet(), ID_HAPPY_MASK)) {
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 100, 0, false, false, false));
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 300, 0, false, false, false));
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 40L);
+
+        // Default mask sneak-to-sprint charge & speed boost
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    UUID id = p.getUniqueId();
+                    if (!FokendLegendaryWepons.this.isLegendary(p.getInventory().getHelmet(), ID_DEFAULT_MASK)
+                            || FokendLegendaryWepons.this.isLocked(p)) {
+                        FokendLegendaryWepons.this.maskRunUntil.remove(id);
+                        FokendLegendaryWepons.this.setRunBoost(p, false);
+                    } else {
+                        Long until = FokendLegendaryWepons.this.maskRunUntil.get(id);
+                        boolean active = until != null && now < until;
+                        if (p.isSneaking()) {
+                            Long start = FokendLegendaryWepons.this.maskSneakStart.get(id);
+                            if (start == null) {
+                                start = now;
+                                FokendLegendaryWepons.this.maskSneakStart.put(id, now);
+                            }
+                            long elapsed = now - start;
+                            if (elapsed >= MASK_RUN_DELAY) {
+                                if (!active) {
+                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                            p, Component.text("Бег активирован: +20% скорости!", NamedTextColor.GREEN));
+                                    p.playSound(p.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 1.0F, 1.4F);
+                                }
+                                FokendLegendaryWepons.this.maskRunUntil.put(id, now + MASK_RUN_LINGER);
+                            } else if (!active) {
+                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                        p,
+                                        Component.text(
+                                                String.format(Locale.US, "Заряд бега: %.1f / %d с", elapsed / 1000.0D, 5L),
+                                                NamedTextColor.YELLOW));
+                            }
+                        }
+
+                        Long updatedUntil = FokendLegendaryWepons.this.maskRunUntil.get(id);
+                        boolean boostNow = updatedUntil != null && now < updatedUntil;
+                        FokendLegendaryWepons.this.setRunBoost(p, boostNow);
+                        if (boostNow) {
+                            p.getWorld().spawnParticle(
+                                    Particle.CLOUD, p.getLocation().add(0.0D, 0.1D, 0.0D), 2, 0.2D, 0.02D, 0.2D, 0.01D);
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 5L);
+
+        // Default mask mid-air hover
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    UUID id = p.getUniqueId();
+                    double curY = p.getLocation().getY();
+                    Double prevY = FokendLegendaryWepons.this.lastY.put(id, curY);
+                    boolean descending = prevY != null && curY < prevY - 0.05D;
+                    boolean wearingMask = FokendLegendaryWepons.this.isLegendary(
+                            p.getInventory().getHelmet(), ID_DEFAULT_MASK);
+
+                    if (wearingMask
+                            && !p.isOnGround()
+                            && !p.isFlying()
+                            && !p.isGliding()
+                            && !p.isInWater()
+                            && !p.isInLava()
+                            && !p.isClimbing()
+                            && !p.isInsideVehicle()
+                            && p.getGameMode() != GameMode.SPECTATOR
+                            && !FokendLegendaryWepons.this.lockStates.containsKey(id)) {
+                        if (FokendLegendaryWepons.this.hovering.contains(id)) {
+                            if (p.getLocation().getPitch() > 50.0F) {
+                                FokendLegendaryWepons.this.releaseHover(p);
+                                FokendLegendaryWepons.this.fallingFree.add(id);
+                                p.setFallDistance(0.0F);
+                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                        p, Component.text("Падение", NamedTextColor.GRAY));
+                            } else {
+                                p.setFallDistance(0.0F);
+                                Vector vel = p.getVelocity();
+                                if (Math.abs(vel.getY()) > 1.0E-4D) {
+                                    p.setVelocity(new Vector(vel.getX() * 0.8D, 0.0D, vel.getZ() * 0.8D));
+                                }
+                                p.getWorld().spawnParticle(
+                                        Particle.CLOUD,
+                                        p.getLocation().add(0.0D, 0.1D, 0.0D),
+                                        2, 0.25D, 0.02D, 0.25D, 0.01D);
+                                if (p.getTicksLived() % 10 == 0) {
+                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                            p,
+                                            Component.text("Парение: посмотри вниз, чтобы упасть", NamedTextColor.AQUA));
+                                }
+                            }
+                        } else if (!FokendLegendaryWepons.this.fallingFree.contains(id) && descending) {
+                            RayTraceResult ground = p.getWorld().rayTraceBlocks(
+                                    p.getLocation(), new Vector(0, -1, 0), 21.0D, FluidCollisionMode.NEVER, true);
+                            if (ground == null) {
+                                FokendLegendaryWepons.this.hovering.add(id);
+                                p.setGravity(false);
+                                p.setFallDistance(0.0F);
+                                p.setVelocity(new Vector(0, 0, 0));
+                                p.getWorld().playSound(p.getLocation(), Sound.ENTITY_BREEZE_IDLE_AIR, 1.0F, 1.2F);
+                                p.getWorld().spawnParticle(
+                                        Particle.CLOUD, p.getLocation(), 25, 0.4D, 0.1D, 0.4D, 0.05D);
+                            }
+                        }
+                    } else {
+                        FokendLegendaryWepons.this.releaseHover(p);
+                        FokendLegendaryWepons.this.fallingFree.remove(id);
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 1L);
 
         // Periodic cleanup of expired cooldown entries
         new BukkitRunnable() {
@@ -391,6 +559,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         for (Player p : this.getServer().getOnlinePlayers()) {
             this.releaseHover(p);
             this.setRunBoost(p, false);
+            WardenHelmetListener.syncWardenHealthAttribute(this, p, false);
             if (this.wardenBlindness.remove(p.getUniqueId())) {
                 p.removePotionEffect(PotionEffectType.BLINDNESS);
             }
@@ -1803,6 +1972,18 @@ public class FokendLegendaryWepons extends JavaPlugin {
         RecipeChoice.ExactChoice cPurple = new RecipeChoice.ExactChoice(this.cbPurple());
         RecipeChoice.ExactChoice cGreen = new RecipeChoice.ExactChoice(this.cbGreen());
 
+        NamespacedKey kClock = new NamespacedKey(this, "time_clock");
+        this.getServer().removeRecipe(kClock);
+        ShapedRecipe rClock = new ShapedRecipe(kClock, this.timeClock());
+        rClock.shape("SNS", "PCP", "GBG");
+        rClock.setIngredient('S', Material.NETHER_STAR);
+        rClock.setIngredient('N', Material.NETHERITE_BLOCK);
+        rClock.setIngredient('P', cPurple);
+        rClock.setIngredient('C', Material.CLOCK);
+        rClock.setIngredient('G', Material.GOLD_BLOCK);
+        rClock.setIngredient('B', cOrange);
+        this.getServer().addRecipe(rClock);
+
         NamespacedKey kSpear = new NamespacedKey(this, "ice_spear");
         this.getServer().removeRecipe(kSpear);
         ShapedRecipe rSpear = new ShapedRecipe(kSpear, this.iceSpear());
@@ -1813,6 +1994,27 @@ public class FokendLegendaryWepons extends JavaPlugin {
         rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
         rSpear.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rSpear);
+
+        NamespacedKey kMask = new NamespacedKey(this, "default_mask");
+        this.getServer().removeRecipe(kMask);
+        ShapedRecipe rMask = new ShapedRecipe(kMask, this.defaultMask());
+        rMask.shape("CHC", "NSN", "CEC");
+        rMask.setIngredient('C', cOrange);
+        rMask.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
+        rMask.setIngredient('N', Material.NETHERITE_BLOCK);
+        rMask.setIngredient('S', Material.NETHER_STAR);
+        rMask.setIngredient('E', Material.EMERALD_BLOCK);
+        this.getServer().addRecipe(rMask);
+
+        NamespacedKey kWarden = new NamespacedKey(this, "warden_helmet");
+        this.getServer().removeRecipe(kWarden);
+        ShapedRecipe rWarden = new ShapedRecipe(kWarden, this.wardenHelmet());
+        rWarden.shape("HSH", "SCS", "N N");
+        rWarden.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
+        rWarden.setIngredient('S', Material.WITHER_SKELETON_SKULL);
+        rWarden.setIngredient('C', Material.SCULK_CATALYST);
+        rWarden.setIngredient('N', Material.NETHERITE_INGOT);
+        this.getServer().addRecipe(rWarden);
 
         NamespacedKey kRa = new NamespacedKey(this, "ra_blade");
         this.getServer().removeRecipe(kRa);
@@ -1825,6 +2027,17 @@ public class FokendLegendaryWepons extends JavaPlugin {
         rRa.setIngredient('B', Material.BLAZE_ROD);
         this.getServer().addRecipe(rRa);
 
+        NamespacedKey kBoomerang = new NamespacedKey(this, "chaos_boomerang");
+        this.getServer().removeRecipe(kBoomerang);
+        ShapedRecipe rBoomerang = new ShapedRecipe(kBoomerang, this.chaosBoomerang());
+        rBoomerang.shape("DSD", "NTN", "NBN");
+        rBoomerang.setIngredient('D', new RecipeChoice.MaterialChoice(Material.DIAMOND_SWORD));
+        rBoomerang.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
+        rBoomerang.setIngredient('T', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
+        rBoomerang.setIngredient('N', Material.NETHERITE_INGOT);
+        rBoomerang.setIngredient('B', Material.BOOK);
+        this.getServer().addRecipe(rBoomerang);
+
         NamespacedKey kTwins = new NamespacedKey(this, "twins_sword");
         this.getServer().removeRecipe(kTwins);
         ShapedRecipe rTwins = new ShapedRecipe(kTwins, this.twinsSword());
@@ -1835,6 +2048,27 @@ public class FokendLegendaryWepons extends JavaPlugin {
         rTwins.setIngredient('R', Material.NETHER_STAR);
         rTwins.setIngredient('B', Material.END_ROD);
         this.getServer().addRecipe(rTwins);
+
+        NamespacedKey kMagnet = new NamespacedKey(this, "magnet");
+        this.getServer().removeRecipe(kMagnet);
+        ShapedRecipe rMagnet = new ShapedRecipe(kMagnet, this.magnet());
+        rMagnet.shape("RWB", "RMB", "NIN");
+        rMagnet.setIngredient('R', Material.RED_CONCRETE);
+        rMagnet.setIngredient('B', Material.BLUE_CONCRETE);
+        rMagnet.setIngredient('W', Material.WITHER_SKELETON_SKULL);
+        rMagnet.setIngredient('M', Material.MACE);
+        rMagnet.setIngredient('I', Material.IRON_BLOCK);
+        rMagnet.setIngredient('N', Material.NETHERITE_INGOT);
+        this.getServer().addRecipe(rMagnet);
+
+        NamespacedKey kHappy = new NamespacedKey(this, "happy_mask");
+        this.getServer().removeRecipe(kHappy);
+        ShapedRecipe rHappy = new ShapedRecipe(kHappy, this.happyMask());
+        rHappy.shape("CDC", "DSD", "CDC");
+        rHappy.setIngredient('C', Material.NETHER_BRICK);
+        rHappy.setIngredient('D', Material.NETHERITE_INGOT);
+        rHappy.setIngredient('S', cOrange);
+        this.getServer().addRecipe(rHappy);
 
         NamespacedKey kDeath = new NamespacedKey(this, "death_note");
         this.getServer().removeRecipe(kDeath);
@@ -1893,9 +2127,12 @@ public class FokendLegendaryWepons extends JavaPlugin {
 
     private class LegendaryCommand implements CommandExecutor, TabCompleter {
         private final List<String> IDS = List.of(
-                "cb_orange", "cb_purple", "cb_green", "ra_blade", "twins_sword",
-                "ice_spear", "ice_spear_ice", "ice_spear_spike",
-                "death_note", "fate_scales", "fate_lightning", "resetcrafts"
+                "cb_orange", "cb_purple", "cb_green", "ra_blade", "chaos_boomerang",
+                "warden_helmet", "twins_sword", "magnet", "time_clock", "ice_spear",
+                "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
+                "mask_block", "mask_mace", "mask_tompson", "soul_bow",
+                "death_note", "fate_scales", "fate_lightning",
+                "fix", "clearsouls", "resetcrafts"
         );
 
         @Override
@@ -1909,12 +2146,54 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 return true;
             }
             if (args.length < 1) {
-                p.sendMessage("Использование: /legendary <id|resetcrafts>");
+                p.sendMessage("Использование: /legendary <id|fix|clearsouls|resetcrafts>");
                 return true;
             }
             String sub = args[0].toLowerCase(Locale.ROOT);
+            if (sub.equals("fix")) {
+                UUID id = p.getUniqueId();
+                TimeSession sOwner = FokendLegendaryWepons.this.timeSessions.get(id);
+                if (sOwner != null) {
+                    FokendLegendaryWepons.this.endTimeSession(sOwner, null);
+                }
+                TimeSession sTarget = FokendLegendaryWepons.this.timeByTarget.get(id);
+                if (sTarget != null) {
+                    FokendLegendaryWepons.this.endTimeSession(sTarget, null);
+                }
+                FokendLegendaryWepons.this.unlockEntity(id);
+                FokendLegendaryWepons.this.releaseHover(p);
+                p.setGravity(true);
+                FokendLegendaryWepons.this.fallingFree.remove(id);
+                FokendLegendaryWepons.this.setRunBoost(p, false);
+                p.setInvulnerable(false);
+                p.setNoDamageTicks(0);
+                p.setMaximumNoDamageTicks(20);
+                p.removePotionEffect(PotionEffectType.SLOWNESS);
+                p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+                p.sendMessage(Component.text("Состояния (заморозка, парение, бессмертие, ускорение) сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
+            if (sub.equals("clearsouls")) {
+                Set<UUID> allAffected = new HashSet<>();
+                allAffected.addAll(FokendLegendaryWepons.this.souls.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.soulless.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.revived.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.revivers.keySet());
+                FokendLegendaryWepons.this.souls.clear();
+                for (UUID affected : allAffected) {
+                    Player online = FokendLegendaryWepons.this.getServer().getPlayer(affected);
+                    if (online != null) {
+                        FokendLegendaryWepons.this.setHealthModifier(online, "soul_consume", 0.0D, false);
+                    }
+                    FokendLegendaryWepons.this.normalize(affected);
+                }
+                FokendLegendaryWepons.this.saveSouls();
+                p.sendMessage(Component.text("Все состояния Лука Душ сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
             if (sub.equals("resetcrafts")) {
                 FokendLegendaryWepons.this.craftedUniques.clear();
+                FokendLegendaryWepons.this.saveSouls();
                 for (Player online : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
                     for (String rKey : RECIPE_KEYS) {
                         online.discoverRecipe(new NamespacedKey(FokendLegendaryWepons.this, rKey));
@@ -1944,7 +2223,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                         }
                     }
                 } else {
-                    p.sendMessage("Использование: /legendary <id|resetcrafts> или /legendary give <ник> <id>");
+                    p.sendMessage("Использование: /legendary <id|fix|clearsouls|resetcrafts> или /legendary give <ник> <id>");
                     return true;
                 }
             }
@@ -1954,10 +2233,20 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 case "cb_purple" -> FokendLegendaryWepons.this.cbPurple();
                 case "cb_green" -> FokendLegendaryWepons.this.cbGreen();
                 case "ra_blade", "ra", "ra_god_blade" -> FokendLegendaryWepons.this.raBlade();
+                case "chaos_boomerang", "chaos", "boomerang" -> FokendLegendaryWepons.this.chaosBoomerang();
+                case "warden_helmet", "warden" -> FokendLegendaryWepons.this.wardenHelmet();
                 case "twins_sword", "twins" -> FokendLegendaryWepons.this.twinsSword();
+                case "magnet" -> FokendLegendaryWepons.this.magnet();
+                case "time_clock", "clock" -> FokendLegendaryWepons.this.timeClock();
                 case "ice_spear", "spear" -> FokendLegendaryWepons.this.iceSpear();
                 case "ice_spear_ice" -> FokendLegendaryWepons.this.iceSpearIce();
                 case "ice_spear_spike" -> FokendLegendaryWepons.this.iceSpearSpike();
+                case "default_mask", "mask" -> FokendLegendaryWepons.this.defaultMask();
+                case "happy_mask" -> FokendLegendaryWepons.this.happyMask();
+                case "mask_block" -> FokendLegendaryWepons.this.maskBlock();
+                case "mask_mace" -> FokendLegendaryWepons.this.maskMace();
+                case "mask_tompson", "thompson" -> FokendLegendaryWepons.this.maskThompson();
+                case "soul_bow", "bow" -> FokendLegendaryWepons.this.soulBow();
                 case "death_note", "deathnote" -> DeathNoteListener.create(FokendLegendaryWepons.this);
                 case "fate_scales", "scales_of_fate", "scales" -> ScalesOfFateListener.createScales(FokendLegendaryWepons.this);
                 case "fate_lightning", "lightning" -> ScalesOfFateListener.createLightning(FokendLegendaryWepons.this);
@@ -1998,6 +2287,82 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 for (String id : this.IDS) {
                     if (id.toLowerCase(Locale.ROOT).startsWith(prefix)) {
                         out.add(id);
+                    }
+                }
+            }
+            return out;
+        }
+    }
+
+    private class ReviveCommand implements CommandExecutor, TabCompleter {
+        @Override
+        public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+            if (!(sender instanceof Player reviver)) {
+                sender.sendMessage("Только для игроков.");
+                return true;
+            }
+            if (args.length != 1) {
+                reviver.sendMessage("Использование: /revive <ник>");
+                return true;
+            }
+            if (FokendLegendaryWepons.this.isSoulless(reviver.getUniqueId())) {
+                reviver.sendMessage(Component.text("Бездушный не может никого возродить.", NamedTextColor.RED));
+                return true;
+            }
+            Player target = FokendLegendaryWepons.this.getServer().getPlayerExact(args[0]);
+            if (target == null) {
+                reviver.sendMessage(Component.text("Игрок не в сети.", NamedTextColor.RED));
+                return true;
+            }
+            if (target.equals(reviver)) {
+                reviver.sendMessage(Component.text("Нельзя возродить себя.", NamedTextColor.RED));
+                return true;
+            }
+            UUID bowOwnerId = FokendLegendaryWepons.this.soulless.get(target.getUniqueId());
+            if (bowOwnerId == null) {
+                reviver.sendMessage(Component.text("У этого игрока душа на месте.", NamedTextColor.RED));
+                return true;
+            }
+            AttributeInstance maxHealth = reviver.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth == null || maxHealth.getValue() < 12.0D) {
+                reviver.sendMessage(Component.text(
+                        "Недостаточно сердец: нужно отдать 5, и должно остаться хотя бы одно.", NamedTextColor.RED));
+                return true;
+            }
+
+            FokendLegendaryWepons.this.setHealthModifier(
+                    reviver,
+                    "soul_gift_" + target.getUniqueId() + "_" + System.currentTimeMillis(),
+                    -10.0D,
+                    true);
+            FokendLegendaryWepons.this.soulless.remove(target.getUniqueId());
+            FokendLegendaryWepons.this.revived.put(target.getUniqueId(), bowOwnerId);
+            FokendLegendaryWepons.this.revivers.put(reviver.getUniqueId(), bowOwnerId);
+            FokendLegendaryWepons.this.saveSouls();
+            FokendLegendaryWepons.this.setHealthModifier(target, "soul_cap", -10.0D, true);
+            target.teleport(reviver.getLocation());
+            target.setGameMode(GameMode.SURVIVAL);
+            AttributeInstance targetMax = target.getAttribute(Attribute.MAX_HEALTH);
+            target.setHealth(Math.min(REVIVE_HP, targetMax != null ? targetMax.getValue() : REVIVE_HP));
+            target.getWorld().spawnParticle(
+                    Particle.SOUL, target.getLocation().add(0.0D, 1.0D, 0.0D), 40, 0.4D, 0.8D, 0.4D, 0.05D);
+            target.getWorld().playSound(target.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1.0F, 0.8F);
+            reviver.sendMessage(Component.text(
+                    "Вы отдали 5 сердец и возродили " + target.getName() + ".", NamedTextColor.GREEN));
+            target.sendMessage(Component.text(
+                    "Вас возродил " + reviver.getName() + ". Вы вернулись с 5 сердцами.", NamedTextColor.GREEN));
+            return true;
+        }
+
+        @Override
+        public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+            List<String> out = new ArrayList<>();
+            if (args.length == 1) {
+                String prefix = args[0].toLowerCase(Locale.ROOT);
+                for (Player online : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    if (FokendLegendaryWepons.this.isSoulless(online.getUniqueId())
+                            && online.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                        out.add(online.getName());
                     }
                 }
             }
