@@ -178,7 +178,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
     static final List<String> RECIPE_KEYS = List.of(
             "cb_orange", "cb_purple", "cb_green", "time_clock", "ice_spear",
             "default_mask", "warden_helmet", "ra_blade", "chaos_boomerang",
-            "twins_sword", "magnet", "happy_mask", "death_note", "fate_scales"
+            "twins_sword", "magnet", "death_note", "fate_scales"
     );
 
     public FokendLegendaryWepons() {
@@ -2066,14 +2066,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
         rMagnet.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rMagnet);
 
-        NamespacedKey kHappy = new NamespacedKey(this, "happy_mask");
-        this.getServer().removeRecipe(kHappy);
-        ShapedRecipe rHappy = new ShapedRecipe(kHappy, this.happyMask());
-        rHappy.shape("CDC", "DSD", "CDC");
-        rHappy.setIngredient('C', Material.NETHER_BRICK);
-        rHappy.setIngredient('D', Material.NETHERITE_INGOT);
-        rHappy.setIngredient('S', cOrange);
-        this.getServer().addRecipe(rHappy);
+        // The Happy Mask is only the worn form of the Chaos Mask, not a separate craft.
+        // Remove the old recipe so it disappears after a reload too.
+        this.getServer().removeRecipe(new NamespacedKey(this, "happy_mask"));
 
         NamespacedKey kDeath = new NamespacedKey(this, "death_note");
         this.getServer().removeRecipe(kDeath);

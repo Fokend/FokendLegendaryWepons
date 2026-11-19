@@ -63,6 +63,13 @@ class AnnouncedRecipesTest extends PluginTestBase {
     }
 
     @Test
+    void happyMaskIsNotCraftable() {
+        assertEquals(null, this.server.getRecipe(new NamespacedKey(this.plugin, "happy_mask")),
+                "the Happy Mask is the worn form of the Chaos Mask, not a separate recipe");
+        assertTrue(!FokendLegendaryWepons.RECIPE_KEYS.contains("happy_mask"));
+    }
+
+    @Test
     void frostSpear() {
         ShapedRecipe r = recipe("ice_spear");
         assertArrayEquals(new String[]{"IBI", "GSG", "INI"}, r.getShape());
