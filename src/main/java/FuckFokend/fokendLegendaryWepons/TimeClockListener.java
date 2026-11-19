@@ -29,6 +29,7 @@ final class TimeClockListener implements Listener {
     public void onHit(EntityDamageByEntityEvent e) {
         if (!(e.getDamager() instanceof Player p)) return;
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_TIME_CLOCK)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_TIME_CLOCK)) return;
 
         e.setCancelled(true);
         if (e.getCause() == DamageCause.ENTITY_SWEEP_ATTACK) return;
@@ -59,6 +60,7 @@ final class TimeClockListener implements Listener {
 
         Player p = e.getPlayer();
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_TIME_CLOCK)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_TIME_CLOCK)) return;
         if (!this.plugin.checkAndMarkTick(p, "time_clock")) return;
 
         e.setCancelled(true);

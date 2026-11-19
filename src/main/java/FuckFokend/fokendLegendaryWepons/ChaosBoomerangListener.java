@@ -54,6 +54,7 @@ final class ChaosBoomerangListener implements Listener {
         final Player p = e.getPlayer();
         ItemStack held = p.getInventory().getItemInMainHand();
         if (!this.plugin.isLegendary(held, FokendLegendaryWepons.ID_CHAOS_BOOMERANG)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_CHAOS_BOOMERANG)) return;
         if (!this.plugin.checkAndMarkTick(p, "chaos_boomerang")) return;
 
         e.setCancelled(true);

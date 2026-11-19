@@ -1,5 +1,12 @@
 # Development Build changelog
 
+## 1.3.4 — 2026-11-19
+
+- Kill switch for legendary abilities: `/legendary disable <name>`, `/legendary enable <name>`, `/legendary disabled`.
+  Switching an ability off stops only its active effect; the item stays with the player and all item protections keep working.
+  The state is saved in `plugins/FokendLegendaryWepons/disabled-abilities.yml` and survives restarts.
+  Names: ra_blade, chaos_boomerang, warden_helmet, twins_sword, magnet, time_clock, ice_spear, default_mask, mask_tompson, soul_bow, death_note, fate_scales, fate_lightning.
+
 ## 1.3.3 — 2026-11-19
 
 - Ra Blade («Гелиос»): enchanted golden apples, and nether stars instead of netherite swords in the bottom corners, as posted in #крафты.

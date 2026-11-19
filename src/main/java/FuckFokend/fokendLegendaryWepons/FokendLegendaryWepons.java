@@ -175,6 +175,19 @@ public class FokendLegendaryWepons extends JavaPlugin {
     NamespacedKey runKey;
     NamespacedKey wardenHpKey;
 
+
+    /** Kill switch: name used in /legendary disable|enable -> legendary id checked by the ability listeners. */
+    static final Map<String, String> ABILITY_SWITCHES = Map.ofEntries(
+            Map.entry("ra_blade", ID_RA_BLADE), Map.entry("chaos_boomerang", ID_CHAOS_BOOMERANG),
+            Map.entry("warden_helmet", ID_WARDEN_HELMET), Map.entry("twins_sword", ID_TWINS_SWORD),
+            Map.entry("magnet", ID_MAGNET), Map.entry("time_clock", ID_TIME_CLOCK), Map.entry("ice_spear", ID_ICE_SPEAR),
+            Map.entry("default_mask", ID_DEFAULT_MASK), Map.entry("mask_tompson", ID_MASK_TOMPSON),
+            Map.entry("soul_bow", ID_SOUL_BOW), Map.entry("death_note", "death_note"),
+            Map.entry("fate_scales", "fate_scales"), Map.entry("fate_lightning", "fate_lightning"));
+    /** Legendary ids whose active abilities are switched off by an admin (persisted in disabled-abilities.yml). */
+    final Set<String> disabledAbilities = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> disabledNotice = new ConcurrentHashMap<>();
+
     static final List<String> RECIPE_KEYS = List.of(
             "cb_orange", "cb_purple", "cb_green", "time_clock", "ice_spear",
             "default_mask", "warden_helmet", "ra_blade", "chaos_boomerang",
@@ -198,6 +211,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         // Loads souls.yml (also holds crafted_uniques) and sets soulFile; without it saveSouls() throws
         // and the one-craft-per-server limit is lost on restart.
         this.loadSouls();
+        this.loadDisabledAbilities();
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new RaBladeListener(this), this);
@@ -760,6 +774,58 @@ public class FokendLegendaryWepons extends JavaPlugin {
             }
         }
         return null;
+    }
+
+
+    /**
+     * Kill switch check for ability triggers. Item protections and passive bookkeeping do not call this,
+     * so a disabled legendary still cannot be dropped, duped or lost; only its active ability stops.
+     */
+    boolean abilityDisabled(Player p, String id) {
+        if (!this.disabledAbilities.contains(id)) {
+            return false;
+        }
+        if (p != null) {
+            long now = System.currentTimeMillis();
+            Long last = this.disabledNotice.get(p.getUniqueId());
+            if (last == null || now - last > 2000L) {
+                this.disabledNotice.put(p.getUniqueId(), now);
+                p.sendActionBar(Component.text("⛔ Способность временно отключена администрацией", NamedTextColor.RED));
+            }
+        }
+        return true;
+    }
+
+    File disabledAbilitiesFile() {
+        return new File(this.getDataFolder(), "disabled-abilities.yml");
+    }
+
+    void loadDisabledAbilities() {
+        this.disabledAbilities.clear();
+        File f = this.disabledAbilitiesFile();
+        if (!f.exists()) {
+            return;
+        }
+        YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+        for (String id : cfg.getStringList("disabled")) {
+            if (ABILITY_SWITCHES.containsValue(id)) {
+                this.disabledAbilities.add(id);
+            }
+        }
+        if (!this.disabledAbilities.isEmpty()) {
+            this.getLogger().warning("Отключённые способности (kill switch): " + String.join(", ", this.disabledAbilities));
+        }
+    }
+
+    void saveDisabledAbilities() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("disabled", new ArrayList<>(new java.util.TreeSet<>(this.disabledAbilities)));
+        try {
+            this.getDataFolder().mkdirs();
+            cfg.save(this.disabledAbilitiesFile());
+        } catch (IOException ex) {
+            this.getLogger().warning("Не удалось сохранить disabled-abilities.yml: " + ex.getMessage());
+        }
     }
 
     boolean isLegendary(ItemStack item, String id) {
@@ -2132,7 +2198,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
                 "mask_block", "mask_mace", "mask_tompson", "soul_bow",
                 "death_note", "fate_scales", "fate_lightning",
-                "fix", "clearsouls", "resetcrafts"
+                "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled"
         );
 
         @Override
@@ -2146,7 +2212,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 return true;
             }
             if (args.length < 1) {
-                p.sendMessage("Использование: /legendary <id|fix|clearsouls|resetcrafts>");
+                p.sendMessage("Использование: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled>");
                 return true;
             }
             String sub = args[0].toLowerCase(Locale.ROOT);
@@ -2200,6 +2266,45 @@ public class FokendLegendaryWepons extends JavaPlugin {
                     }
                 }
                 p.sendMessage(Component.text("Лимиты крафта легендарных предметов сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
+
+            if (sub.equals("disable") || sub.equals("enable")) {
+                java.util.TreeSet<String> names = new java.util.TreeSet<>(ABILITY_SWITCHES.keySet());
+                if (args.length < 2) {
+                    p.sendMessage("Использование: /legendary " + sub + " <" + String.join("|", names) + ">");
+                    return true;
+                }
+                String name = args[1].toLowerCase(Locale.ROOT);
+                String abilityId = ABILITY_SWITCHES.get(name);
+                if (abilityId == null) {
+                    p.sendMessage(Component.text("Неизвестная способность: " + name + ". Доступно: " + String.join(", ", names), NamedTextColor.RED));
+                    return true;
+                }
+                boolean off = sub.equals("disable");
+                boolean changed = off ? FokendLegendaryWepons.this.disabledAbilities.add(abilityId)
+                        : FokendLegendaryWepons.this.disabledAbilities.remove(abilityId);
+                FokendLegendaryWepons.this.saveDisabledAbilities();
+                if (!changed) {
+                    p.sendMessage(Component.text("Способность " + name + " уже " + (off ? "отключена." : "включена."), NamedTextColor.YELLOW));
+                    return true;
+                }
+                FokendLegendaryWepons.this.getLogger().warning(p.getName() + (off ? " отключил" : " включил") + " способность " + name);
+                p.sendMessage(Component.text("Способность " + name + (off ? " отключена. Предметы остаются у игроков, защита работает." : " снова включена."),
+                        off ? NamedTextColor.RED : NamedTextColor.GREEN));
+                return true;
+            }
+            if (sub.equals("disabled")) {
+                List<String> off = new ArrayList<>();
+                for (Map.Entry<String, String> en : ABILITY_SWITCHES.entrySet()) {
+                    if (FokendLegendaryWepons.this.disabledAbilities.contains(en.getValue())) {
+                        off.add(en.getKey());
+                    }
+                }
+                java.util.Collections.sort(off);
+                p.sendMessage(off.isEmpty()
+                        ? Component.text("Все способности включены.", NamedTextColor.GREEN)
+                        : Component.text("Отключены: " + String.join(", ", off), NamedTextColor.RED));
                 return true;
             }
 
@@ -2273,6 +2378,15 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 for (String id : this.IDS) {
                     if (id.toLowerCase(Locale.ROOT).startsWith(prefix)) {
                         out.add(id);
+                    }
+                }
+            } else if (args.length == 2 && (args[0].equalsIgnoreCase("disable") || args[0].equalsIgnoreCase("enable"))) {
+                String prefix = args[1].toLowerCase(Locale.ROOT);
+                boolean enabling = args[0].equalsIgnoreCase("enable");
+                for (Map.Entry<String, String> en : new java.util.TreeMap<>(ABILITY_SWITCHES).entrySet()) {
+                    boolean off = FokendLegendaryWepons.this.disabledAbilities.contains(en.getValue());
+                    if (off == enabling && en.getKey().startsWith(prefix)) {
+                        out.add(en.getKey());
                     }
                 }
             } else if (args.length == 2 && args[0].equalsIgnoreCase("give")) {

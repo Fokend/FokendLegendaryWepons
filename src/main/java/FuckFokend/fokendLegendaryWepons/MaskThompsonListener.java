@@ -29,6 +29,7 @@ final class MaskThompsonListener implements Listener {
         Player p = e.getPlayer();
         ItemStack held = p.getInventory().getItemInMainHand();
         if (!this.plugin.isLegendary(held, FokendLegendaryWepons.ID_MASK_TOMPSON)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_MASK_TOMPSON)) return;
         if (!this.plugin.checkAndMarkTick(p, "mask_tompson")) return;
 
         e.setCancelled(true);

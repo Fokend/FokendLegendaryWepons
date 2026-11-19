@@ -43,6 +43,7 @@ final class MagnetListener implements Listener {
 
         Player p = e.getPlayer();
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_MAGNET)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_MAGNET)) return;
 
         e.setCancelled(true);
         if (!this.plugin.checkAndMarkTick(p, "magnet")) return;

@@ -8,7 +8,7 @@ description: Легендарное оружие и ядра SMP
 commands:
   legendary:
     description: Выдача легендарного оружия и управление состояниями
-    usage: /legendary <id|fix|clearsouls|resetcrafts>
+    usage: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled>
     permission: legendary.admin
   revive:
     description: Возродить игрока и очистить бездушие за 5 сердец

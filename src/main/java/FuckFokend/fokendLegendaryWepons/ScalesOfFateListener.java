@@ -177,7 +177,7 @@ final class ScalesOfFateListener implements Listener {
          Action a = e.getAction();
          if (a == Action.RIGHT_CLICK_AIR || a == Action.RIGHT_CLICK_BLOCK) {
             Player p = e.getPlayer();
-            if (this.isScales(p.getInventory().getItemInMainHand())) {
+            if (this.isScales(p.getInventory().getItemInMainHand()) && !this.plugin.abilityDisabled(p, "fate_scales")) {
                if (this.plugin.isAbilityClick(e) && this.plugin.checkAndMarkTick(p, "fate_rmb")) {
                   if (p.isSneaking()) {
                      this.highJudgement(p);
@@ -281,7 +281,7 @@ final class ScalesOfFateListener implements Listener {
                LivingEntity target = (LivingEntity)var4;
                if (!this.damageGuard.contains(p.getUniqueId()) && !this.damageGuard.contains(target.getUniqueId())) {
                   ItemStack hand = p.getInventory().getItemInMainHand();
-                  if (this.isLightning(hand)) {
+                  if (this.isLightning(hand) && !this.plugin.abilityDisabled(p, "fate_lightning")) {
                      if (!this.lightningAlive(hand)) {
                         return;
                      }

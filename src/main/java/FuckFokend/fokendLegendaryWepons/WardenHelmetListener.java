@@ -337,6 +337,7 @@ final class WardenHelmetListener implements Listener {
         Player p = e.getPlayer();
         if (this.plugin.isLocked(p)) return;
         if (!this.plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_WARDEN_HELMET)) return;
 
         ItemStack mainHand = p.getInventory().getItemInMainHand();
         ItemStack offHand = p.getInventory().getItemInOffHand();
@@ -393,6 +394,7 @@ final class WardenHelmetListener implements Listener {
         if (!p.isSneaking() && !bothHandsEmpty) return;
         if (this.plugin.isLocked(p)) return;
         if (!this.plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_WARDEN_HELMET)) return;
 
         e.setCancelled(true);
         long now = System.currentTimeMillis();

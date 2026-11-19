@@ -90,6 +90,7 @@ final class DefaultMaskListener implements Listener {
             if (!this.plugin.checkAndMarkTick(p, "mask_hammer")) {
                 return;
             }
+            if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_DEFAULT_MASK)) return;
             this.triggerHammer(p);
         }
     }
@@ -111,7 +112,8 @@ final class DefaultMaskListener implements Listener {
                 && (emptyHand || holdingMask)) {
             e.setCancelled(true);
             if (this.plugin.checkAndMarkTick(p, "mask_hammer")) {
-                this.triggerHammer(p);
+                if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_DEFAULT_MASK)) return;
+            this.triggerHammer(p);
             }
             return;
         }

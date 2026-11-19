@@ -46,6 +46,7 @@ final class SoulBowListener implements Listener {
         Player p = e.getPlayer();
         if (!p.isSneaking()) return;
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_SOUL_BOW)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_SOUL_BOW)) return;
         if (!this.plugin.checkAndMarkTick(p, "soul_bow_consume")) return;
 
         e.setCancelled(true);
@@ -91,6 +92,7 @@ final class SoulBowListener implements Listener {
     public void onShoot(EntityShootBowEvent e) {
         if (!(e.getEntity() instanceof Player p)) return;
         if (!this.plugin.isLegendary(e.getBow(), FokendLegendaryWepons.ID_SOUL_BOW)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_SOUL_BOW)) return;
 
         if (this.plugin.isSoulless(p.getUniqueId()) || this.plugin.isLocked(p)) {
             e.setCancelled(true);

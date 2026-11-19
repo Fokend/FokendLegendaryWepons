@@ -55,6 +55,7 @@ final class RaBladeListener implements Listener {
 
         Player p = e.getPlayer();
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_RA_BLADE)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_RA_BLADE)) return;
         if (!this.plugin.checkAndMarkTick(p, "ra_blade")) return;
 
         e.setCancelled(true);

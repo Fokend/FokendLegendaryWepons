@@ -54,7 +54,7 @@ final class TwinsSwordListener implements Listener {
                 || this.plugin.isLegendary(e.getOffHandItem(), FokendLegendaryWepons.ID_TWINS_SWORD)
                 || this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_TWINS_SWORD)
                 || this.plugin.isLegendary(p.getInventory().getItemInOffHand(), FokendLegendaryWepons.ID_TWINS_SWORD);
-        if (hasTwins) {
+        if (hasTwins && !this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_TWINS_SWORD)) {
             long now = System.currentTimeMillis();
             Long last = this.swapCooldowns.get(p.getUniqueId());
             if (last != null && now - last < 500L) {
@@ -72,6 +72,7 @@ final class TwinsSwordListener implements Listener {
 
         Player p = e.getPlayer();
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_TWINS_SWORD)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_TWINS_SWORD)) return;
         if (!this.plugin.checkAndMarkTick(p, "twins_sword")) return;
 
         e.setCancelled(true);
@@ -293,6 +294,7 @@ final class TwinsSwordListener implements Listener {
         if (!(e.getDamager() instanceof Player p)) return;
         if (e.getCause() == DamageCause.ENTITY_SWEEP_ATTACK) return;
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_TWINS_SWORD)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_TWINS_SWORD)) return;
         if (!this.plugin.isTargetable(e.getEntity(), p)) return;
 
         LivingEntity victim = (LivingEntity) e.getEntity();

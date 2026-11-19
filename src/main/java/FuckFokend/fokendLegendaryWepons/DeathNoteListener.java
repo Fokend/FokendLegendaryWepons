@@ -574,6 +574,10 @@ final class DeathNoteListener implements Listener {
         if (held == null || !this.plugin.isLegendary(held, "death_note")) {
             return;
         }
+        if (this.plugin.abilityDisabled(p, "death_note")) {
+            e.setCancelled(true);
+            return;
+        }
 
         if (e.isSigning()) {
             e.setCancelled(true);

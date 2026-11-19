@@ -43,6 +43,7 @@ final class IceSpearListener implements Listener {
         if (!p.isSneaking()) return;
         ItemStack held = p.getInventory().getItemInMainHand();
         if (!this.plugin.isLegendary(held, FokendLegendaryWepons.ID_ICE_SPEAR)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_ICE_SPEAR)) return;
         if (p.getInventory().getHeldItemSlot() != 0) return;
         if (!this.plugin.checkAndMarkTick(p, "ice_spear")) return;
 
@@ -91,6 +92,7 @@ final class IceSpearListener implements Listener {
         if (e.getCause() == DamageCause.ENTITY_SWEEP_ATTACK) return;
         if (p.getInventory().getHeldItemSlot() != 1) return;
         if (!this.plugin.isLegendary(p.getInventory().getItemInMainHand(), FokendLegendaryWepons.ID_ICE_SPEAR)) return;
+        if (this.plugin.abilityDisabled(p, FokendLegendaryWepons.ID_ICE_SPEAR)) return;
         if (!this.plugin.isTargetable(e.getEntity(), p)) return;
 
         LivingEntity victim = (LivingEntity) e.getEntity();
