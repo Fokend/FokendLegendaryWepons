@@ -2034,7 +2034,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
         NamespacedKey kBoomerang = new NamespacedKey(this, "chaos_boomerang");
         this.getServer().removeRecipe(kBoomerang);
         ShapedRecipe rBoomerang = new ShapedRecipe(kBoomerang, this.chaosBoomerang());
-        rBoomerang.shape("DSD", "NTN", "NBN");
+        rBoomerang.shape("DSD", "HTH", "NBN");
+        rBoomerang.setIngredient('H', Material.HEAVY_CORE);
         rBoomerang.setIngredient('D', new RecipeChoice.MaterialChoice(Material.DIAMOND_SWORD));
         rBoomerang.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
         rBoomerang.setIngredient('T', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));

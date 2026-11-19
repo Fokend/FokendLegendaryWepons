@@ -3,6 +3,7 @@
 ## 1.3.3 — in progress
 
 - Ra Blade («Гелиос»): enchanted golden apples, and nether stars instead of netherite swords in the bottom corners, as posted in #крафты.
+- Chaos Boomerang: heavy cores on both sides of the trident instead of netherite ingots.
 
 ## 1.3.2 — 2026-11-19
 
