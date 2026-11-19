@@ -2022,8 +2022,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
         NamespacedKey kRa = new NamespacedKey(this, "ra_blade");
         this.getServer().removeRecipe(kRa);
         ShapedRecipe rRa = new ShapedRecipe(kRa, this.raBlade());
-        rRa.shape("ASA", "TMT", "SBS");
-        rRa.setIngredient('A', Material.GOLDEN_APPLE);
+        rRa.shape("ASA", "TMT", "RBR");
+        rRa.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
+        rRa.setIngredient('R', Material.NETHER_STAR);
         rRa.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
         rRa.setIngredient('T', Material.TOTEM_OF_UNDYING);
         rRa.setIngredient('M', Material.MACE);
