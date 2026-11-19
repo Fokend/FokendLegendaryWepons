@@ -58,7 +58,7 @@ class AnnouncedRecipesTest extends PluginTestBase {
         assertArrayEquals(new String[]{"BAB", "ANA", "BAB"}, r.getShape());
         Map<Character, RecipeChoice> m = r.getChoiceMap();
         assertMaterial(m, 'B', Material.BLUE_ICE);
-        assertMaterial(m, 'A', Material.GOLDEN_APPLE);
+        assertMaterial(m, 'A', Material.ENCHANTED_GOLDEN_APPLE);
         assertMaterial(m, 'N', Material.NETHERITE_INGOT);
     }
 

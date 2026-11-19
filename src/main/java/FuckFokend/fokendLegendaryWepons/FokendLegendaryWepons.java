@@ -1971,7 +1971,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         ShapedRecipe rGreen = new ShapedRecipe(kGreen, this.cbGreen());
         rGreen.shape("BAB", "ANA", "BAB");
         rGreen.setIngredient('B', Material.BLUE_ICE);
-        rGreen.setIngredient('A', Material.GOLDEN_APPLE);
+        rGreen.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
         rGreen.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rGreen);
 

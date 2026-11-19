@@ -1,5 +1,9 @@
 # Development Build changelog
 
+## 1.3.2 — 2026-11-19
+
+- Singularity Chain Core (green) takes enchanted golden apples, not plain golden apples.
+
 ## 1.3.1 — 2026-11-19
 
 - Recipes now match the announcements in Discord (#новости, 24.09):
