@@ -1,5 +1,14 @@
 # Development Build changelog
 
+## 1.3.1 — 2026-11-19
+
+- Recipes now match the announcements in Discord (#новости, 24.09):
+  - Impulse Core (orange): copper block, ancient debris, copper block / netherite ingot, piglin head, netherite ingot / totem, eye of ender, totem.
+  - Core of the Eternal Cycle (purple): netherite scrap and ingots around an Impulse Core.
+  - Singularity Chain Core (green): blue ice in the corners, golden apples on the sides, netherite ingot in the centre.
+  - Frost Spear: blue ice instead of packed ice and a netherite spear in the centre (was trident or netherite sword).
+- Cores may now be used in any plugin recipe, including other cores, but still not in vanilla recipes.
+
 ## 1.3.0 — 2026-11-17
 
 - Restored the full plugin: Chaos Boomerang, Warden Helmet, Magnet, Time Clock, Soul Bow, Default Mask, Thompson and Freeze are back (they were removed in 610ee83). The source now matches the jar running on the server (FokendLegendaryWepons-all-weapons-fixed.jar).

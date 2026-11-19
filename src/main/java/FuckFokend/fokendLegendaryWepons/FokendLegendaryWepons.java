@@ -1944,33 +1944,36 @@ public class FokendLegendaryWepons extends JavaPlugin {
         NamespacedKey kOrange = new NamespacedKey(this, "cb_orange");
         this.getServer().removeRecipe(kOrange);
         ShapedRecipe rOrange = new ShapedRecipe(kOrange, this.cbOrange());
-        rOrange.shape("CSC", "SNS", "CSC");
+        rOrange.shape("CDC", "NPN", "TET");
         rOrange.setIngredient('C', Material.COPPER_BLOCK);
-        rOrange.setIngredient('S', Material.ECHO_SHARD);
-        rOrange.setIngredient('N', Material.NETHER_STAR);
+        rOrange.setIngredient('D', Material.ANCIENT_DEBRIS);
+        rOrange.setIngredient('N', Material.NETHERITE_INGOT);
+        rOrange.setIngredient('P', Material.PIGLIN_HEAD);
+        rOrange.setIngredient('T', Material.TOTEM_OF_UNDYING);
+        rOrange.setIngredient('E', Material.ENDER_EYE);
         this.getServer().addRecipe(rOrange);
+
+        RecipeChoice.ExactChoice cOrange = new RecipeChoice.ExactChoice(this.cbOrange());
+        RecipeChoice.ExactChoice cPurple = new RecipeChoice.ExactChoice(this.cbPurple());
+        RecipeChoice.ExactChoice cGreen = new RecipeChoice.ExactChoice(this.cbGreen());
 
         NamespacedKey kPurple = new NamespacedKey(this, "cb_purple");
         this.getServer().removeRecipe(kPurple);
         ShapedRecipe rPurple = new ShapedRecipe(kPurple, this.cbPurple());
-        rPurple.shape("ANA", "NHN", "ANA");
-        rPurple.setIngredient('A', Material.AMETHYST_BLOCK);
-        rPurple.setIngredient('N', Material.NETHERITE_INGOT);
-        rPurple.setIngredient('H', Material.HEART_OF_THE_SEA);
+        rPurple.shape(" SI", "SCS", "IS ");
+        rPurple.setIngredient('S', Material.NETHERITE_SCRAP);
+        rPurple.setIngredient('I', Material.NETHERITE_INGOT);
+        rPurple.setIngredient('C', cOrange);
         this.getServer().addRecipe(rPurple);
 
         NamespacedKey kGreen = new NamespacedKey(this, "cb_green");
         this.getServer().removeRecipe(kGreen);
         ShapedRecipe rGreen = new ShapedRecipe(kGreen, this.cbGreen());
-        rGreen.shape("ESE", "STS", "ESE");
-        rGreen.setIngredient('E', Material.EMERALD_BLOCK);
-        rGreen.setIngredient('S', Material.PRISMARINE_SHARD);
-        rGreen.setIngredient('T', Material.TOTEM_OF_UNDYING);
+        rGreen.shape("BAB", "ANA", "BAB");
+        rGreen.setIngredient('B', Material.BLUE_ICE);
+        rGreen.setIngredient('A', Material.GOLDEN_APPLE);
+        rGreen.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rGreen);
-
-        RecipeChoice.ExactChoice cOrange = new RecipeChoice.ExactChoice(this.cbOrange());
-        RecipeChoice.ExactChoice cPurple = new RecipeChoice.ExactChoice(this.cbPurple());
-        RecipeChoice.ExactChoice cGreen = new RecipeChoice.ExactChoice(this.cbGreen());
 
         NamespacedKey kClock = new NamespacedKey(this, "time_clock");
         this.getServer().removeRecipe(kClock);
@@ -1988,10 +1991,10 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.getServer().removeRecipe(kSpear);
         ShapedRecipe rSpear = new ShapedRecipe(kSpear, this.iceSpear());
         rSpear.shape("IBI", "GSG", "INI");
-        rSpear.setIngredient('I', Material.PACKED_ICE);
+        rSpear.setIngredient('I', Material.BLUE_ICE);
         rSpear.setIngredient('B', cOrange);
         rSpear.setIngredient('G', cGreen);
-        rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
+        rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SPEAR));
         rSpear.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rSpear);
 
