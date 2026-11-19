@@ -2058,8 +2058,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.getServer().removeRecipe(kMagnet);
         ShapedRecipe rMagnet = new ShapedRecipe(kMagnet, this.magnet());
         rMagnet.shape("RWB", "RMB", "NIN");
-        rMagnet.setIngredient('R', Material.RED_CONCRETE);
-        rMagnet.setIngredient('B', Material.BLUE_CONCRETE);
+        rMagnet.setIngredient('R', Material.REDSTONE_BLOCK);
+        rMagnet.setIngredient('B', Material.LAPIS_BLOCK);
         rMagnet.setIngredient('W', Material.WITHER_SKELETON_SKULL);
         rMagnet.setIngredient('M', Material.MACE);
         rMagnet.setIngredient('I', Material.IRON_BLOCK);
