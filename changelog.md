@@ -1,9 +1,9 @@
 # Development Build changelog
 
-## 1.3.3 — in progress
+## 1.3.3 — 2026-11-19
 
 - Ra Blade («Гелиос»): enchanted golden apples, and nether stars instead of netherite swords in the bottom corners, as posted in #крафты.
-- Chaos Boomerang: heavy cores on both sides of the trident instead of netherite ingots.
+- Chaos Boomerang: heavy cores on both sides of the trident instead of netherite ingots, and a shield instead of a book in the bottom middle.
 - Magnet: redstone blocks and lapis blocks instead of red and blue concrete.
 - Removed the separate Happy Mask recipe: the Happy Mask is only the worn form of the Chaos Mask.
 

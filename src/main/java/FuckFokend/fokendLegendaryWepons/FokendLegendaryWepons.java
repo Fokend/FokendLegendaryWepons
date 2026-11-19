@@ -2040,7 +2040,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         rBoomerang.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
         rBoomerang.setIngredient('T', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
         rBoomerang.setIngredient('N', Material.NETHERITE_INGOT);
-        rBoomerang.setIngredient('B', Material.BOOK);
+        rBoomerang.setIngredient('B', Material.SHIELD);
         this.getServer().addRecipe(rBoomerang);
 
         NamespacedKey kTwins = new NamespacedKey(this, "twins_sword");
