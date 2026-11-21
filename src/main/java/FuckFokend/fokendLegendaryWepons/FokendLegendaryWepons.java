@@ -78,7 +78,7 @@ import org.bukkit.util.Vector;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
-public final class FokendLegendaryWepons extends JavaPlugin {
+public class FokendLegendaryWepons extends JavaPlugin {
     static final String ID_CB_ORANGE = "cb_orange";
     static final String ID_CB_PURPLE = "cb_purple";
     static final String ID_CB_GREEN = "cb_green";
@@ -175,9 +175,23 @@ public final class FokendLegendaryWepons extends JavaPlugin {
     NamespacedKey runKey;
     NamespacedKey wardenHpKey;
 
+
+    /** Kill switch: name used in /legendary disable|enable -> legendary id checked by the ability listeners. */
+    static final Map<String, String> ABILITY_SWITCHES = Map.ofEntries(
+            Map.entry("ra_blade", ID_RA_BLADE), Map.entry("chaos_boomerang", ID_CHAOS_BOOMERANG),
+            Map.entry("warden_helmet", ID_WARDEN_HELMET), Map.entry("twins_sword", ID_TWINS_SWORD),
+            Map.entry("magnet", ID_MAGNET), Map.entry("time_clock", ID_TIME_CLOCK), Map.entry("ice_spear", ID_ICE_SPEAR),
+            Map.entry("default_mask", ID_DEFAULT_MASK), Map.entry("mask_tompson", ID_MASK_TOMPSON),
+            Map.entry("soul_bow", ID_SOUL_BOW), Map.entry("death_note", "death_note"),
+            Map.entry("fate_scales", "fate_scales"), Map.entry("fate_lightning", "fate_lightning"));
+    /** Legendary ids whose active abilities are switched off by an admin (persisted in disabled-abilities.yml). */
+    final Set<String> disabledAbilities = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> disabledNotice = new ConcurrentHashMap<>();
+
     static final List<String> RECIPE_KEYS = List.of(
-            "cb_orange", "cb_purple", "cb_green", "ra_blade", "twins_sword",
-            "ice_spear", "death_note", "fate_scales"
+            "cb_orange", "cb_purple", "cb_green", "time_clock", "ice_spear",
+            "default_mask", "warden_helmet", "ra_blade", "chaos_boomerang",
+            "twins_sword", "magnet", "death_note", "fate_scales"
     );
 
     public FokendLegendaryWepons() {
@@ -194,11 +208,23 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         this.frozenKey = new NamespacedKey(this, "time_frozen");
         this.runKey = new NamespacedKey(this, "mask_run");
         this.wardenHpKey = new NamespacedKey(this, "warden_hp");
+        // Loads souls.yml (also holds crafted_uniques) and sets soulFile; without it saveSouls() throws
+        // and the one-craft-per-server limit is lost on restart.
+        this.loadSouls();
+        this.loadDisabledAbilities();
 
         PluginManager pm = this.getServer().getPluginManager();
         pm.registerEvents(new RaBladeListener(this), this);
+        pm.registerEvents(new WardenHelmetListener(this), this);
         pm.registerEvents(new IceSpearListener(this), this);
+        pm.registerEvents(new MaskThompsonListener(this), this);
+        pm.registerEvents(new SoulBowListener(this), this);
+        pm.registerEvents(new TimeClockListener(this), this);
+        pm.registerEvents(new FreezeListener(this), this);
+        pm.registerEvents(new ChaosBoomerangListener(this), this);
         pm.registerEvents(new TwinsSwordListener(this), this);
+        pm.registerEvents(new MagnetListener(this), this);
+        pm.registerEvents(new DefaultMaskListener(this), this);
         pm.registerEvents(new CleanupListener(this), this);
         pm.registerEvents(new CraftProtectionListener(this), this);
         pm.registerEvents(new CoreUpgradeListener(this), this);
@@ -216,8 +242,167 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         this.disableConflictingLegacyPlugins(legendaryExec);
         this.getServer().getScheduler().runTask(this, () -> this.disableConflictingLegacyPlugins(legendaryExec));
 
+        final ReviveCommand reviveExec = new ReviveCommand();
+        PluginCommand reviveCmd = this.getCommand("revive");
+        if (reviveCmd != null) {
+            reviveCmd.setExecutor(reviveExec);
+            reviveCmd.setTabCompleter(reviveExec);
+        } else {
+            Command fallback = new Command("revive") {
+                @Override
+                public boolean execute(CommandSender sender, String label, String[] args) {
+                    return reviveExec.onCommand(sender, this, label, args);
+                }
+
+                @Override
+                public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+                    return reviveExec.onTabComplete(sender, this, alias, args);
+                }
+            };
+            fallback.setDescription("Возродить бездушного игрока (цена: 5 сердец)");
+            fallback.setUsage("/revive <ник>");
+            this.getServer().getCommandMap().register("fokendlegendary", fallback);
+        }
+
         this.registerRecipes();
         this.logRecipes();
+        this.getLogger().info("FokendLegendaryWepons " + this.getPluginMeta().getVersion()
+                + ": 10 легендарок (Клинок Ра, Бумеранг Хаоса, Шлем Вардена, Меч Близнецов, Магнитник,"
+                + " Часы, Морозное копьё, Маска, Томпсон, Лук Душ) + Тетрадь Смерти, Весы Судьбы, 3 ядра.");
+
+        for (World world : this.getServer().getWorlds()) {
+            for (LivingEntity entity : world.getLivingEntities()) {
+                this.restoreStaleFrozen(entity);
+            }
+        }
+
+        // Happy mask passive effects (Warden helmet is handled by WardenHelmetListener's task)
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    if (FokendLegendaryWepons.this.isLegendary(p.getInventory().getHelmet(), ID_HAPPY_MASK)) {
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 100, 0, false, false, false));
+                        p.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 300, 0, false, false, false));
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 40L);
+
+        // Default mask sneak-to-sprint charge & speed boost
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    UUID id = p.getUniqueId();
+                    if (!FokendLegendaryWepons.this.isLegendary(p.getInventory().getHelmet(), ID_DEFAULT_MASK)
+                            || FokendLegendaryWepons.this.isLocked(p)) {
+                        FokendLegendaryWepons.this.maskRunUntil.remove(id);
+                        FokendLegendaryWepons.this.setRunBoost(p, false);
+                    } else {
+                        Long until = FokendLegendaryWepons.this.maskRunUntil.get(id);
+                        boolean active = until != null && now < until;
+                        if (p.isSneaking()) {
+                            Long start = FokendLegendaryWepons.this.maskSneakStart.get(id);
+                            if (start == null) {
+                                start = now;
+                                FokendLegendaryWepons.this.maskSneakStart.put(id, now);
+                            }
+                            long elapsed = now - start;
+                            if (elapsed >= MASK_RUN_DELAY) {
+                                if (!active) {
+                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                            p, Component.text("Бег активирован: +20% скорости!", NamedTextColor.GREEN));
+                                    p.playSound(p.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 1.0F, 1.4F);
+                                }
+                                FokendLegendaryWepons.this.maskRunUntil.put(id, now + MASK_RUN_LINGER);
+                            } else if (!active) {
+                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                        p,
+                                        Component.text(
+                                                String.format(Locale.US, "Заряд бега: %.1f / %d с", elapsed / 1000.0D, 5L),
+                                                NamedTextColor.YELLOW));
+                            }
+                        }
+
+                        Long updatedUntil = FokendLegendaryWepons.this.maskRunUntil.get(id);
+                        boolean boostNow = updatedUntil != null && now < updatedUntil;
+                        FokendLegendaryWepons.this.setRunBoost(p, boostNow);
+                        if (boostNow) {
+                            p.getWorld().spawnParticle(
+                                    Particle.CLOUD, p.getLocation().add(0.0D, 0.1D, 0.0D), 2, 0.2D, 0.02D, 0.2D, 0.01D);
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 5L);
+
+        // Default mask mid-air hover
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    UUID id = p.getUniqueId();
+                    double curY = p.getLocation().getY();
+                    Double prevY = FokendLegendaryWepons.this.lastY.put(id, curY);
+                    boolean descending = prevY != null && curY < prevY - 0.05D;
+                    boolean wearingMask = FokendLegendaryWepons.this.isLegendary(
+                            p.getInventory().getHelmet(), ID_DEFAULT_MASK);
+
+                    if (wearingMask
+                            && !p.isOnGround()
+                            && !p.isFlying()
+                            && !p.isGliding()
+                            && !p.isInWater()
+                            && !p.isInLava()
+                            && !p.isClimbing()
+                            && !p.isInsideVehicle()
+                            && p.getGameMode() != GameMode.SPECTATOR
+                            && !FokendLegendaryWepons.this.lockStates.containsKey(id)) {
+                        if (FokendLegendaryWepons.this.hovering.contains(id)) {
+                            if (p.getLocation().getPitch() > 50.0F) {
+                                FokendLegendaryWepons.this.releaseHover(p);
+                                FokendLegendaryWepons.this.fallingFree.add(id);
+                                p.setFallDistance(0.0F);
+                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                        p, Component.text("Падение", NamedTextColor.GRAY));
+                            } else {
+                                p.setFallDistance(0.0F);
+                                Vector vel = p.getVelocity();
+                                if (Math.abs(vel.getY()) > 1.0E-4D) {
+                                    p.setVelocity(new Vector(vel.getX() * 0.8D, 0.0D, vel.getZ() * 0.8D));
+                                }
+                                p.getWorld().spawnParticle(
+                                        Particle.CLOUD,
+                                        p.getLocation().add(0.0D, 0.1D, 0.0D),
+                                        2, 0.25D, 0.02D, 0.25D, 0.01D);
+                                if (p.getTicksLived() % 10 == 0) {
+                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                            p,
+                                            Component.text("Парение: посмотри вниз, чтобы упасть", NamedTextColor.AQUA));
+                                }
+                            }
+                        } else if (!FokendLegendaryWepons.this.fallingFree.contains(id) && descending) {
+                            RayTraceResult ground = p.getWorld().rayTraceBlocks(
+                                    p.getLocation(), new Vector(0, -1, 0), 21.0D, FluidCollisionMode.NEVER, true);
+                            if (ground == null) {
+                                FokendLegendaryWepons.this.hovering.add(id);
+                                p.setGravity(false);
+                                p.setFallDistance(0.0F);
+                                p.setVelocity(new Vector(0, 0, 0));
+                                p.getWorld().playSound(p.getLocation(), Sound.ENTITY_BREEZE_IDLE_AIR, 1.0F, 1.2F);
+                                p.getWorld().spawnParticle(
+                                        Particle.CLOUD, p.getLocation(), 25, 0.4D, 0.1D, 0.4D, 0.05D);
+                            }
+                        }
+                    } else {
+                        FokendLegendaryWepons.this.releaseHover(p);
+                        FokendLegendaryWepons.this.fallingFree.remove(id);
+                    }
+                }
+            }
+        }.runTaskTimer(this, 0L, 1L);
 
         // Periodic cleanup of expired cooldown entries
         new BukkitRunnable() {
@@ -388,6 +573,7 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         for (Player p : this.getServer().getOnlinePlayers()) {
             this.releaseHover(p);
             this.setRunBoost(p, false);
+            WardenHelmetListener.syncWardenHealthAttribute(this, p, false);
             if (this.wardenBlindness.remove(p.getUniqueId())) {
                 p.removePotionEffect(PotionEffectType.BLINDNESS);
             }
@@ -588,6 +774,58 @@ public final class FokendLegendaryWepons extends JavaPlugin {
             }
         }
         return null;
+    }
+
+
+    /**
+     * Kill switch check for ability triggers. Item protections and passive bookkeeping do not call this,
+     * so a disabled legendary still cannot be dropped, duped or lost; only its active ability stops.
+     */
+    boolean abilityDisabled(Player p, String id) {
+        if (!this.disabledAbilities.contains(id)) {
+            return false;
+        }
+        if (p != null) {
+            long now = System.currentTimeMillis();
+            Long last = this.disabledNotice.get(p.getUniqueId());
+            if (last == null || now - last > 2000L) {
+                this.disabledNotice.put(p.getUniqueId(), now);
+                p.sendActionBar(Component.text("⛔ Способность временно отключена администрацией", NamedTextColor.RED));
+            }
+        }
+        return true;
+    }
+
+    File disabledAbilitiesFile() {
+        return new File(this.getDataFolder(), "disabled-abilities.yml");
+    }
+
+    void loadDisabledAbilities() {
+        this.disabledAbilities.clear();
+        File f = this.disabledAbilitiesFile();
+        if (!f.exists()) {
+            return;
+        }
+        YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+        for (String id : cfg.getStringList("disabled")) {
+            if (ABILITY_SWITCHES.containsValue(id)) {
+                this.disabledAbilities.add(id);
+            }
+        }
+        if (!this.disabledAbilities.isEmpty()) {
+            this.getLogger().warning("Отключённые способности (kill switch): " + String.join(", ", this.disabledAbilities));
+        }
+    }
+
+    void saveDisabledAbilities() {
+        YamlConfiguration cfg = new YamlConfiguration();
+        cfg.set("disabled", new ArrayList<>(new java.util.TreeSet<>(this.disabledAbilities)));
+        try {
+            this.getDataFolder().mkdirs();
+            cfg.save(this.disabledAbilitiesFile());
+        } catch (IOException ex) {
+            this.getLogger().warning("Не удалось сохранить disabled-abilities.yml: " + ex.getMessage());
+        }
     }
 
     boolean isLegendary(ItemStack item, String id) {
@@ -1772,55 +2010,104 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         NamespacedKey kOrange = new NamespacedKey(this, "cb_orange");
         this.getServer().removeRecipe(kOrange);
         ShapedRecipe rOrange = new ShapedRecipe(kOrange, this.cbOrange());
-        rOrange.shape("CSC", "SNS", "CSC");
+        rOrange.shape("CDC", "NPN", "TET");
         rOrange.setIngredient('C', Material.COPPER_BLOCK);
-        rOrange.setIngredient('S', Material.ECHO_SHARD);
-        rOrange.setIngredient('N', Material.NETHER_STAR);
+        rOrange.setIngredient('D', Material.ANCIENT_DEBRIS);
+        rOrange.setIngredient('N', Material.NETHERITE_INGOT);
+        rOrange.setIngredient('P', Material.PIGLIN_HEAD);
+        rOrange.setIngredient('T', Material.TOTEM_OF_UNDYING);
+        rOrange.setIngredient('E', Material.ENDER_EYE);
         this.getServer().addRecipe(rOrange);
-
-        NamespacedKey kPurple = new NamespacedKey(this, "cb_purple");
-        this.getServer().removeRecipe(kPurple);
-        ShapedRecipe rPurple = new ShapedRecipe(kPurple, this.cbPurple());
-        rPurple.shape("ANA", "NHN", "ANA");
-        rPurple.setIngredient('A', Material.AMETHYST_BLOCK);
-        rPurple.setIngredient('N', Material.NETHERITE_INGOT);
-        rPurple.setIngredient('H', Material.HEART_OF_THE_SEA);
-        this.getServer().addRecipe(rPurple);
-
-        NamespacedKey kGreen = new NamespacedKey(this, "cb_green");
-        this.getServer().removeRecipe(kGreen);
-        ShapedRecipe rGreen = new ShapedRecipe(kGreen, this.cbGreen());
-        rGreen.shape("ESE", "STS", "ESE");
-        rGreen.setIngredient('E', Material.EMERALD_BLOCK);
-        rGreen.setIngredient('S', Material.PRISMARINE_SHARD);
-        rGreen.setIngredient('T', Material.TOTEM_OF_UNDYING);
-        this.getServer().addRecipe(rGreen);
 
         RecipeChoice.ExactChoice cOrange = new RecipeChoice.ExactChoice(this.cbOrange());
         RecipeChoice.ExactChoice cPurple = new RecipeChoice.ExactChoice(this.cbPurple());
         RecipeChoice.ExactChoice cGreen = new RecipeChoice.ExactChoice(this.cbGreen());
 
+        NamespacedKey kPurple = new NamespacedKey(this, "cb_purple");
+        this.getServer().removeRecipe(kPurple);
+        ShapedRecipe rPurple = new ShapedRecipe(kPurple, this.cbPurple());
+        rPurple.shape(" SI", "SCS", "IS ");
+        rPurple.setIngredient('S', Material.NETHERITE_SCRAP);
+        rPurple.setIngredient('I', Material.NETHERITE_INGOT);
+        rPurple.setIngredient('C', cOrange);
+        this.getServer().addRecipe(rPurple);
+
+        NamespacedKey kGreen = new NamespacedKey(this, "cb_green");
+        this.getServer().removeRecipe(kGreen);
+        ShapedRecipe rGreen = new ShapedRecipe(kGreen, this.cbGreen());
+        rGreen.shape("BAB", "ANA", "BAB");
+        rGreen.setIngredient('B', Material.BLUE_ICE);
+        rGreen.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
+        rGreen.setIngredient('N', Material.NETHERITE_INGOT);
+        this.getServer().addRecipe(rGreen);
+
+        NamespacedKey kClock = new NamespacedKey(this, "time_clock");
+        this.getServer().removeRecipe(kClock);
+        ShapedRecipe rClock = new ShapedRecipe(kClock, this.timeClock());
+        rClock.shape("SNS", "PCP", "GBG");
+        rClock.setIngredient('S', Material.NETHER_STAR);
+        rClock.setIngredient('N', Material.NETHERITE_BLOCK);
+        rClock.setIngredient('P', cPurple);
+        rClock.setIngredient('C', Material.CLOCK);
+        rClock.setIngredient('G', Material.GOLD_BLOCK);
+        rClock.setIngredient('B', cOrange);
+        this.getServer().addRecipe(rClock);
+
         NamespacedKey kSpear = new NamespacedKey(this, "ice_spear");
         this.getServer().removeRecipe(kSpear);
         ShapedRecipe rSpear = new ShapedRecipe(kSpear, this.iceSpear());
         rSpear.shape("IBI", "GSG", "INI");
-        rSpear.setIngredient('I', Material.PACKED_ICE);
+        rSpear.setIngredient('I', Material.BLUE_ICE);
         rSpear.setIngredient('B', cOrange);
         rSpear.setIngredient('G', cGreen);
-        rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
+        rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SPEAR));
         rSpear.setIngredient('N', Material.NETHERITE_INGOT);
         this.getServer().addRecipe(rSpear);
+
+        NamespacedKey kMask = new NamespacedKey(this, "default_mask");
+        this.getServer().removeRecipe(kMask);
+        ShapedRecipe rMask = new ShapedRecipe(kMask, this.defaultMask());
+        rMask.shape("CHC", "NSN", "CEC");
+        rMask.setIngredient('C', cOrange);
+        rMask.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
+        rMask.setIngredient('N', Material.NETHERITE_BLOCK);
+        rMask.setIngredient('S', Material.NETHER_STAR);
+        rMask.setIngredient('E', Material.EMERALD_BLOCK);
+        this.getServer().addRecipe(rMask);
+
+        NamespacedKey kWarden = new NamespacedKey(this, "warden_helmet");
+        this.getServer().removeRecipe(kWarden);
+        ShapedRecipe rWarden = new ShapedRecipe(kWarden, this.wardenHelmet());
+        rWarden.shape("HSH", "SCS", "N N");
+        rWarden.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
+        rWarden.setIngredient('S', Material.WITHER_SKELETON_SKULL);
+        rWarden.setIngredient('C', Material.SCULK_CATALYST);
+        rWarden.setIngredient('N', Material.NETHERITE_INGOT);
+        this.getServer().addRecipe(rWarden);
 
         NamespacedKey kRa = new NamespacedKey(this, "ra_blade");
         this.getServer().removeRecipe(kRa);
         ShapedRecipe rRa = new ShapedRecipe(kRa, this.raBlade());
-        rRa.shape("ASA", "TMT", "SBS");
-        rRa.setIngredient('A', Material.GOLDEN_APPLE);
+        rRa.shape("ASA", "TMT", "RBR");
+        rRa.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
+        rRa.setIngredient('R', Material.NETHER_STAR);
         rRa.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
         rRa.setIngredient('T', Material.TOTEM_OF_UNDYING);
         rRa.setIngredient('M', Material.MACE);
         rRa.setIngredient('B', Material.BLAZE_ROD);
         this.getServer().addRecipe(rRa);
+
+        NamespacedKey kBoomerang = new NamespacedKey(this, "chaos_boomerang");
+        this.getServer().removeRecipe(kBoomerang);
+        ShapedRecipe rBoomerang = new ShapedRecipe(kBoomerang, this.chaosBoomerang());
+        rBoomerang.shape("DSD", "HTH", "NBN");
+        rBoomerang.setIngredient('H', Material.HEAVY_CORE);
+        rBoomerang.setIngredient('D', new RecipeChoice.MaterialChoice(Material.DIAMOND_SWORD));
+        rBoomerang.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
+        rBoomerang.setIngredient('T', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
+        rBoomerang.setIngredient('N', Material.NETHERITE_INGOT);
+        rBoomerang.setIngredient('B', Material.SHIELD);
+        this.getServer().addRecipe(rBoomerang);
 
         NamespacedKey kTwins = new NamespacedKey(this, "twins_sword");
         this.getServer().removeRecipe(kTwins);
@@ -1832,6 +2119,22 @@ public final class FokendLegendaryWepons extends JavaPlugin {
         rTwins.setIngredient('R', Material.NETHER_STAR);
         rTwins.setIngredient('B', Material.END_ROD);
         this.getServer().addRecipe(rTwins);
+
+        NamespacedKey kMagnet = new NamespacedKey(this, "magnet");
+        this.getServer().removeRecipe(kMagnet);
+        ShapedRecipe rMagnet = new ShapedRecipe(kMagnet, this.magnet());
+        rMagnet.shape("RWB", "RMB", "NIN");
+        rMagnet.setIngredient('R', Material.REDSTONE_BLOCK);
+        rMagnet.setIngredient('B', Material.LAPIS_BLOCK);
+        rMagnet.setIngredient('W', Material.WITHER_SKELETON_SKULL);
+        rMagnet.setIngredient('M', Material.MACE);
+        rMagnet.setIngredient('I', Material.IRON_BLOCK);
+        rMagnet.setIngredient('N', Material.NETHERITE_INGOT);
+        this.getServer().addRecipe(rMagnet);
+
+        // The Happy Mask is only the worn form of the Chaos Mask, not a separate craft.
+        // Remove the old recipe so it disappears after a reload too.
+        this.getServer().removeRecipe(new NamespacedKey(this, "happy_mask"));
 
         NamespacedKey kDeath = new NamespacedKey(this, "death_note");
         this.getServer().removeRecipe(kDeath);
@@ -1890,9 +2193,12 @@ public final class FokendLegendaryWepons extends JavaPlugin {
 
     private class LegendaryCommand implements CommandExecutor, TabCompleter {
         private final List<String> IDS = List.of(
-                "cb_orange", "cb_purple", "cb_green", "ra_blade", "twins_sword",
-                "ice_spear", "ice_spear_ice", "ice_spear_spike",
-                "death_note", "fate_scales", "fate_lightning", "resetcrafts"
+                "cb_orange", "cb_purple", "cb_green", "ra_blade", "chaos_boomerang",
+                "warden_helmet", "twins_sword", "magnet", "time_clock", "ice_spear",
+                "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
+                "mask_block", "mask_mace", "mask_tompson", "soul_bow",
+                "death_note", "fate_scales", "fate_lightning",
+                "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled"
         );
 
         @Override
@@ -1906,18 +2212,99 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                 return true;
             }
             if (args.length < 1) {
-                p.sendMessage("Использование: /legendary <id|resetcrafts>");
+                p.sendMessage("Использование: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled>");
                 return true;
             }
             String sub = args[0].toLowerCase(Locale.ROOT);
+            if (sub.equals("fix")) {
+                UUID id = p.getUniqueId();
+                TimeSession sOwner = FokendLegendaryWepons.this.timeSessions.get(id);
+                if (sOwner != null) {
+                    FokendLegendaryWepons.this.endTimeSession(sOwner, null);
+                }
+                TimeSession sTarget = FokendLegendaryWepons.this.timeByTarget.get(id);
+                if (sTarget != null) {
+                    FokendLegendaryWepons.this.endTimeSession(sTarget, null);
+                }
+                FokendLegendaryWepons.this.unlockEntity(id);
+                FokendLegendaryWepons.this.releaseHover(p);
+                p.setGravity(true);
+                FokendLegendaryWepons.this.fallingFree.remove(id);
+                FokendLegendaryWepons.this.setRunBoost(p, false);
+                p.setInvulnerable(false);
+                p.setNoDamageTicks(0);
+                p.setMaximumNoDamageTicks(20);
+                p.removePotionEffect(PotionEffectType.SLOWNESS);
+                p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+                p.sendMessage(Component.text("Состояния (заморозка, парение, бессмертие, ускорение) сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
+            if (sub.equals("clearsouls")) {
+                Set<UUID> allAffected = new HashSet<>();
+                allAffected.addAll(FokendLegendaryWepons.this.souls.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.soulless.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.revived.keySet());
+                allAffected.addAll(FokendLegendaryWepons.this.revivers.keySet());
+                FokendLegendaryWepons.this.souls.clear();
+                for (UUID affected : allAffected) {
+                    Player online = FokendLegendaryWepons.this.getServer().getPlayer(affected);
+                    if (online != null) {
+                        FokendLegendaryWepons.this.setHealthModifier(online, "soul_consume", 0.0D, false);
+                    }
+                    FokendLegendaryWepons.this.normalize(affected);
+                }
+                FokendLegendaryWepons.this.saveSouls();
+                p.sendMessage(Component.text("Все состояния Лука Душ сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
             if (sub.equals("resetcrafts")) {
                 FokendLegendaryWepons.this.craftedUniques.clear();
+                FokendLegendaryWepons.this.saveSouls();
                 for (Player online : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
                     for (String rKey : RECIPE_KEYS) {
                         online.discoverRecipe(new NamespacedKey(FokendLegendaryWepons.this, rKey));
                     }
                 }
                 p.sendMessage(Component.text("Лимиты крафта легендарных предметов сброшены.", NamedTextColor.GREEN));
+                return true;
+            }
+
+            if (sub.equals("disable") || sub.equals("enable")) {
+                java.util.TreeSet<String> names = new java.util.TreeSet<>(ABILITY_SWITCHES.keySet());
+                if (args.length < 2) {
+                    p.sendMessage("Использование: /legendary " + sub + " <" + String.join("|", names) + ">");
+                    return true;
+                }
+                String name = args[1].toLowerCase(Locale.ROOT);
+                String abilityId = ABILITY_SWITCHES.get(name);
+                if (abilityId == null) {
+                    p.sendMessage(Component.text("Неизвестная способность: " + name + ". Доступно: " + String.join(", ", names), NamedTextColor.RED));
+                    return true;
+                }
+                boolean off = sub.equals("disable");
+                boolean changed = off ? FokendLegendaryWepons.this.disabledAbilities.add(abilityId)
+                        : FokendLegendaryWepons.this.disabledAbilities.remove(abilityId);
+                FokendLegendaryWepons.this.saveDisabledAbilities();
+                if (!changed) {
+                    p.sendMessage(Component.text("Способность " + name + " уже " + (off ? "отключена." : "включена."), NamedTextColor.YELLOW));
+                    return true;
+                }
+                FokendLegendaryWepons.this.getLogger().warning(p.getName() + (off ? " отключил" : " включил") + " способность " + name);
+                p.sendMessage(Component.text("Способность " + name + (off ? " отключена. Предметы остаются у игроков, защита работает." : " снова включена."),
+                        off ? NamedTextColor.RED : NamedTextColor.GREEN));
+                return true;
+            }
+            if (sub.equals("disabled")) {
+                List<String> off = new ArrayList<>();
+                for (Map.Entry<String, String> en : ABILITY_SWITCHES.entrySet()) {
+                    if (FokendLegendaryWepons.this.disabledAbilities.contains(en.getValue())) {
+                        off.add(en.getKey());
+                    }
+                }
+                java.util.Collections.sort(off);
+                p.sendMessage(off.isEmpty()
+                        ? Component.text("Все способности включены.", NamedTextColor.GREEN)
+                        : Component.text("Отключены: " + String.join(", ", off), NamedTextColor.RED));
                 return true;
             }
 
@@ -1941,7 +2328,7 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                         }
                     }
                 } else {
-                    p.sendMessage("Использование: /legendary <id|resetcrafts> или /legendary give <ник> <id>");
+                    p.sendMessage("Использование: /legendary <id|fix|clearsouls|resetcrafts> или /legendary give <ник> <id>");
                     return true;
                 }
             }
@@ -1951,10 +2338,20 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                 case "cb_purple" -> FokendLegendaryWepons.this.cbPurple();
                 case "cb_green" -> FokendLegendaryWepons.this.cbGreen();
                 case "ra_blade", "ra", "ra_god_blade" -> FokendLegendaryWepons.this.raBlade();
+                case "chaos_boomerang", "chaos", "boomerang" -> FokendLegendaryWepons.this.chaosBoomerang();
+                case "warden_helmet", "warden" -> FokendLegendaryWepons.this.wardenHelmet();
                 case "twins_sword", "twins" -> FokendLegendaryWepons.this.twinsSword();
+                case "magnet" -> FokendLegendaryWepons.this.magnet();
+                case "time_clock", "clock" -> FokendLegendaryWepons.this.timeClock();
                 case "ice_spear", "spear" -> FokendLegendaryWepons.this.iceSpear();
                 case "ice_spear_ice" -> FokendLegendaryWepons.this.iceSpearIce();
                 case "ice_spear_spike" -> FokendLegendaryWepons.this.iceSpearSpike();
+                case "default_mask", "mask" -> FokendLegendaryWepons.this.defaultMask();
+                case "happy_mask" -> FokendLegendaryWepons.this.happyMask();
+                case "mask_block" -> FokendLegendaryWepons.this.maskBlock();
+                case "mask_mace" -> FokendLegendaryWepons.this.maskMace();
+                case "mask_tompson", "thompson" -> FokendLegendaryWepons.this.maskThompson();
+                case "soul_bow", "bow" -> FokendLegendaryWepons.this.soulBow();
                 case "death_note", "deathnote" -> DeathNoteListener.create(FokendLegendaryWepons.this);
                 case "fate_scales", "scales_of_fate", "scales" -> ScalesOfFateListener.createScales(FokendLegendaryWepons.this);
                 case "fate_lightning", "lightning" -> ScalesOfFateListener.createLightning(FokendLegendaryWepons.this);
@@ -1983,6 +2380,15 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                         out.add(id);
                     }
                 }
+            } else if (args.length == 2 && (args[0].equalsIgnoreCase("disable") || args[0].equalsIgnoreCase("enable"))) {
+                String prefix = args[1].toLowerCase(Locale.ROOT);
+                boolean enabling = args[0].equalsIgnoreCase("enable");
+                for (Map.Entry<String, String> en : new java.util.TreeMap<>(ABILITY_SWITCHES).entrySet()) {
+                    boolean off = FokendLegendaryWepons.this.disabledAbilities.contains(en.getValue());
+                    if (off == enabling && en.getKey().startsWith(prefix)) {
+                        out.add(en.getKey());
+                    }
+                }
             } else if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
                 String prefix = args[1].toLowerCase(Locale.ROOT);
                 for (Player online : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
@@ -1995,6 +2401,82 @@ public final class FokendLegendaryWepons extends JavaPlugin {
                 for (String id : this.IDS) {
                     if (id.toLowerCase(Locale.ROOT).startsWith(prefix)) {
                         out.add(id);
+                    }
+                }
+            }
+            return out;
+        }
+    }
+
+    private class ReviveCommand implements CommandExecutor, TabCompleter {
+        @Override
+        public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+            if (!(sender instanceof Player reviver)) {
+                sender.sendMessage("Только для игроков.");
+                return true;
+            }
+            if (args.length != 1) {
+                reviver.sendMessage("Использование: /revive <ник>");
+                return true;
+            }
+            if (FokendLegendaryWepons.this.isSoulless(reviver.getUniqueId())) {
+                reviver.sendMessage(Component.text("Бездушный не может никого возродить.", NamedTextColor.RED));
+                return true;
+            }
+            Player target = FokendLegendaryWepons.this.getServer().getPlayerExact(args[0]);
+            if (target == null) {
+                reviver.sendMessage(Component.text("Игрок не в сети.", NamedTextColor.RED));
+                return true;
+            }
+            if (target.equals(reviver)) {
+                reviver.sendMessage(Component.text("Нельзя возродить себя.", NamedTextColor.RED));
+                return true;
+            }
+            UUID bowOwnerId = FokendLegendaryWepons.this.soulless.get(target.getUniqueId());
+            if (bowOwnerId == null) {
+                reviver.sendMessage(Component.text("У этого игрока душа на месте.", NamedTextColor.RED));
+                return true;
+            }
+            AttributeInstance maxHealth = reviver.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth == null || maxHealth.getValue() < 12.0D) {
+                reviver.sendMessage(Component.text(
+                        "Недостаточно сердец: нужно отдать 5, и должно остаться хотя бы одно.", NamedTextColor.RED));
+                return true;
+            }
+
+            FokendLegendaryWepons.this.setHealthModifier(
+                    reviver,
+                    "soul_gift_" + target.getUniqueId() + "_" + System.currentTimeMillis(),
+                    -10.0D,
+                    true);
+            FokendLegendaryWepons.this.soulless.remove(target.getUniqueId());
+            FokendLegendaryWepons.this.revived.put(target.getUniqueId(), bowOwnerId);
+            FokendLegendaryWepons.this.revivers.put(reviver.getUniqueId(), bowOwnerId);
+            FokendLegendaryWepons.this.saveSouls();
+            FokendLegendaryWepons.this.setHealthModifier(target, "soul_cap", -10.0D, true);
+            target.teleport(reviver.getLocation());
+            target.setGameMode(GameMode.SURVIVAL);
+            AttributeInstance targetMax = target.getAttribute(Attribute.MAX_HEALTH);
+            target.setHealth(Math.min(REVIVE_HP, targetMax != null ? targetMax.getValue() : REVIVE_HP));
+            target.getWorld().spawnParticle(
+                    Particle.SOUL, target.getLocation().add(0.0D, 1.0D, 0.0D), 40, 0.4D, 0.8D, 0.4D, 0.05D);
+            target.getWorld().playSound(target.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1.0F, 0.8F);
+            reviver.sendMessage(Component.text(
+                    "Вы отдали 5 сердец и возродили " + target.getName() + ".", NamedTextColor.GREEN));
+            target.sendMessage(Component.text(
+                    "Вас возродил " + reviver.getName() + ". Вы вернулись с 5 сердцами.", NamedTextColor.GREEN));
+            return true;
+        }
+
+        @Override
+        public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+            List<String> out = new ArrayList<>();
+            if (args.length == 1) {
+                String prefix = args[0].toLowerCase(Locale.ROOT);
+                for (Player online : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
+                    if (FokendLegendaryWepons.this.isSoulless(online.getUniqueId())
+                            && online.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                        out.add(online.getName());
                     }
                 }
             }

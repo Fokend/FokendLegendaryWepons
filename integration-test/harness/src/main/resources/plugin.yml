@@ -1,0 +1,10 @@
+name: LegendaryITHarness
+version: '1.0'
+main: fokend.lit.LitPlugin
+api-version: '1.21.11'
+depend: [ FokendLegendaryWepons ]
+description: Integration test harness for FokendLegendaryWepons (test servers only)
+commands:
+  lit:
+    description: Integration test steps
+    usage: /lit <step>

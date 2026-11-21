@@ -1,0 +1,8 @@
+{
+  "name": "fokend-legendary-it-bot",
+  "private": true,
+  "description": "Real-client integration tests for FokendLegendaryWepons (mineflayer bots)",
+  "dependencies": {
+    "mineflayer": "4.39.0"
+  }
+}

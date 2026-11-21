@@ -37,8 +37,9 @@ final class CraftProtectionListener implements Listener {
         for (ItemStack m : inv.getMatrix()) {
             String matId = plugin.getId(m);
             if (matId != null) {
-                // Разрешаем использовать ядра (cb_orange, cb_purple, cb_green) только для крафта легендарных предметов
-                if (plugin.isCraftingCore(matId) && resId != null && !plugin.isCraftingCore(resId)) {
+                // Ядра (cb_orange, cb_purple, cb_green) можно класть только в рецепты плагина:
+                // легендарки и другие ядра (фиолетовое ядро крафтится из оранжевого).
+                if (plugin.isCraftingCore(matId) && resId != null) {
                     continue;
                 }
                 inv.setResult(null);

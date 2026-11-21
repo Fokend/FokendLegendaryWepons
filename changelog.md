@@ -1,5 +1,40 @@
 # Development Build changelog
 
+## 1.3.4 — 2026-11-19
+
+- Kill switch for legendary abilities: `/legendary disable <name>`, `/legendary enable <name>`, `/legendary disabled`.
+  Switching an ability off stops only its active effect; the item stays with the player and all item protections keep working.
+  The state is saved in `plugins/FokendLegendaryWepons/disabled-abilities.yml` and survives restarts.
+  Names: ra_blade, chaos_boomerang, warden_helmet, twins_sword, magnet, time_clock, ice_spear, default_mask, mask_tompson, soul_bow, death_note, fate_scales, fate_lightning.
+
+## 1.3.3 — 2026-11-19
+
+- Ra Blade («Гелиос»): enchanted golden apples, and nether stars instead of netherite swords in the bottom corners, as posted in #крафты.
+- Chaos Boomerang: heavy cores on both sides of the trident instead of netherite ingots, and a shield instead of a book in the bottom middle.
+- Magnet: redstone blocks and lapis blocks instead of red and blue concrete.
+- Removed the separate Happy Mask recipe: the Happy Mask is only the worn form of the Chaos Mask.
+
+## 1.3.2 — 2026-11-19
+
+- Singularity Chain Core (green) takes enchanted golden apples, not plain golden apples.
+
+## 1.3.1 — 2026-11-19
+
+- Recipes now match the announcements in Discord (#новости, 24.09):
+  - Impulse Core (orange): copper block, ancient debris, copper block / netherite ingot, piglin head, netherite ingot / totem, eye of ender, totem.
+  - Core of the Eternal Cycle (purple): netherite scrap and ingots around an Impulse Core.
+  - Singularity Chain Core (green): blue ice in the corners, golden apples on the sides, netherite ingot in the centre.
+  - Frost Spear: blue ice instead of packed ice and a netherite spear in the centre (was trident or netherite sword).
+- Cores may now be used in any plugin recipe, including other cores, but still not in vanilla recipes.
+
+## 1.3.0 — 2026-11-17
+
+- Restored the full plugin: Chaos Boomerang, Warden Helmet, Magnet, Time Clock, Soul Bow, Default Mask, Thompson and Freeze are back (they were removed in 610ee83). The source now matches the jar running on the server (FokendLegendaryWepons-all-weapons-fixed.jar).
+- Kept all later fixes: /check lock, souls.yml loading, Death Note async chat and relog handling, Fate Lightning inventory containment, and the MockBukkit tests.
+- Warden Helmet: right-click with an item that already has a vanilla use (food, shield, bow, pearls, buckets, armor, tools...) no longer fires the Sonic Boom unless sneaking; Scales of Fate and Death Note are treated as items with their own right-click ability.
+- Version is now 1.3.0 (was 1.0-SNAPSHOT for every build), and startup logs the loaded item set so it is easy to check which build a server runs.
+- Model and texture files are ignored by git: the resource pack is shared with projects privately.
+
 ## 2026-10-19
 
 - Added enchantment cores to the anvil: 10%, 15%, and 17% success rates. A successful attempt raises a random existing enchantment by exactly one level, including beyond vanilla maximum levels.
@@ -43,3 +78,12 @@
 - Allowed Sonic Boom clicks from either hand, with same-tick duplicate suppression, so empty-hand air clicks are not rejected by hand filtering.
 # 2026-10-24
 - Added Shift+F as a fallback to activate Warden Helmet Sonic Boom with both hands empty. The normal right-click path and existing cooldown remain unchanged.
+
+## 2026-11-09 (Paper 1.21.11 review)
+
+- Death Note chat cipher no longer reads potion effects or attributes from the async chat thread; it uses main-thread snapshots (invisible players, god-eye holders) refreshed on potion changes and every 10 ticks.
+- Delayed Death Note entries ("Name ticks") look the victim up again by UUID, so they still fire after the victim relogs.
+- `/dnunlock` uses online/cached players only instead of `getOfflinePlayer(String)`, which can block the main thread with a profile lookup.
+- Fate Lightning can no longer be moved into containers with number keys, the off-hand key or dragging (it could escape expiry there).
+- Restored loading of `souls.yml` on enable: it was dropped with the removed weapons, so `crafted_uniques` (one craft per server) was never loaded and every save (craft, shutdown) threw `File cannot be null`.
+- Added MockBukkit unit tests (`gradle test`) and real-server integration tests (`integration-test/`).
