@@ -111,7 +111,7 @@ final class SoulBowListener implements Listener {
         p.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, p.getEyeLocation(), 15, 0.2D, 0.2D, 0.2D, 0.03D);
         p.getWorld().playSound(p.getLocation(), Sound.PARTICLE_SOUL_ESCAPE, 1.0F, 1.0F);
 
-        if (curSouls >= FokendLegendaryWepons.MAX_SOULS && e.getForce() >= 0.25F) {
+        if (curSouls >= this.plugin.balance.getInt("soul_bow.max_souls") && e.getForce() >= 0.25F) {
             this.plugin.souls.put(id, curSouls - 1);
             this.plugin.saveSouls();
             this.plugin.cooldowns.sendPriorityActionBar(

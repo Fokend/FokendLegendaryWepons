@@ -33,7 +33,7 @@ final class MaskThompsonListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "mask_tompson")) return;
 
         e.setCancelled(true);
-        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot", 250L)) return;
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot")) return;
         this.plugin.cooldowns.startSilent(p, "mask_tompson_shot");
 
         if (p.getGameMode() != GameMode.CREATIVE) {

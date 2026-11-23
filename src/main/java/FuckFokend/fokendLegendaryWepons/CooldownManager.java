@@ -14,18 +14,18 @@ import org.bukkit.scheduler.BukkitTask;
 /**
  * Per-player ability cooldowns and the action-bar cooldown HUD.
  *
- * <p>Cooldowns are keyed by {@code "<uuid>:<ability>"}. Each cooldown stores only its start time;
- * the duration is passed in by the caller on every check, so a cooldown can be checked against
- * a different duration than it was set with (this is how the plugin has always behaved).
+ * <p>Cooldowns are keyed by {@code "<uuid>:<ability>"} and store only their start time. Durations are
+ * looked up in config.yml on every check, so a reload applies to cooldowns that are already running.
  */
 final class CooldownManager {
 
     static final int BAR_LENGTH = 10;
-    /** Entries older than this are dropped by the periodic cleanup, whatever their duration. */
+    /** Finished cooldowns are dropped by the periodic cleanup once they are at least this old. */
     private static final long STALE_AFTER_MS = 600_000L;
     private static final long PRIORITY_MESSAGE_MS = 2_000L;
 
     private final Plugin plugin;
+    private final Balance balance;
     private final Map<String, Long> startedAt = new ConcurrentHashMap<>();
     private final Map<String, HudEntry> hud = new ConcurrentHashMap<>();
     private final Map<UUID, String> selected = new ConcurrentHashMap<>();
@@ -34,8 +34,9 @@ final class CooldownManager {
     private BukkitTask cleanupTask;
     private BukkitTask hudTask;
 
-    CooldownManager(Plugin plugin) {
+    CooldownManager(Plugin plugin, Balance balance) {
         this.plugin = plugin;
+        this.balance = balance;
     }
 
     void startTasks() {
@@ -55,25 +56,26 @@ final class CooldownManager {
 
     // ---- cooldowns ----
 
-    boolean isOnCooldown(Player p, String key, long durationMs) {
-        return this.remaining(p, key, durationMs) > 0L;
+    boolean isOnCooldown(Player p, String key) {
+        return this.remaining(p, key) > 0L;
     }
 
-    long remaining(Player p, String key, long durationMs) {
+    /** Remaining time in ms. The duration comes from {@code cooldowns.<key>} in config.yml. */
+    long remaining(Player p, String key) {
         Long started = this.startedAt.get(fullKey(p.getUniqueId(), key));
-        return started == null ? 0L : Math.max(0L, started + durationMs - System.currentTimeMillis());
+        return started == null ? 0L : Math.max(0L, started + this.balance.cooldownMs(key) - System.currentTimeMillis());
     }
 
     /** Remaining time rounded up to whole seconds, for "wait N s" messages. */
-    long remainingSeconds(Player p, String key, long durationMs) {
-        return this.remaining(p, key, durationMs) / 1000L + 1L;
+    long remainingSeconds(Player p, String key) {
+        return this.remaining(p, key) / 1000L + 1L;
     }
 
     /** Starts a cooldown and shows it on the action-bar HUD. */
-    void start(Player p, String key, long durationMs, String displayName) {
+    void start(Player p, String key, String displayName) {
         String fullKey = fullKey(p.getUniqueId(), key);
         this.startedAt.put(fullKey, System.currentTimeMillis());
-        this.hud.put(fullKey, new HudEntry(durationMs, displayName));
+        this.hud.put(fullKey, new HudEntry(this.balance.cooldownMs(key), displayName));
         this.selected.put(p.getUniqueId(), key);
     }
 
@@ -101,7 +103,10 @@ final class CooldownManager {
 
     private void purgeStale() {
         long now = System.currentTimeMillis();
-        this.startedAt.entrySet().removeIf(e -> now - e.getValue() > STALE_AFTER_MS);
+        this.startedAt.entrySet().removeIf(e -> {
+            String ability = e.getKey().substring(e.getKey().indexOf(':') + 1);
+            return now - e.getValue() > Math.max(STALE_AFTER_MS, this.balance.cooldownMs(ability));
+        });
     }
 
     private void tickHud() {

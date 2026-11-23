@@ -156,12 +156,7 @@ final class CoreUpgradeListener implements Listener {
     }
 
     private double chanceFor(String coreId) {
-        return switch (coreId) {
-            case FokendLegendaryWepons.ID_CB_ORANGE -> 0.10D;
-            case FokendLegendaryWepons.ID_CB_PURPLE -> 0.15D;
-            case FokendLegendaryWepons.ID_CB_GREEN -> 0.17D;
-            default -> 0.0D;
-        };
+        return this.plugin.balance.coreUpgradeChance(coreId);
     }
 
     private boolean isSupportedTarget(ItemStack item) {

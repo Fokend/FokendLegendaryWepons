@@ -48,13 +48,13 @@ final class MagnetListener implements Listener {
         e.setCancelled(true);
         if (!this.plugin.checkAndMarkTick(p, "magnet")) return;
 
-        if (this.plugin.cooldowns.isOnCooldown(p, "magnet", 5000L)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "magnet", 5000L);
+        if (this.plugin.cooldowns.isOnCooldown(p, "magnet")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "magnet");
             this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Магнит на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "magnet", 5000L, "Магнитник");
+        this.plugin.cooldowns.start(p, "magnet", "Магнитник");
         Location center = p.getLocation();
         final World world = p.getWorld();
 

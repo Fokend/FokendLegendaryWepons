@@ -25,9 +25,6 @@ import org.bukkit.util.Vector;
 import org.joml.Vector3f;
 
 final class IceSpearListener implements Listener {
-    private static final long CD = 75000L;
-    private static final long FREEZE_HIT_CD = 6000L;
-    private static final double RADIUS = 15.0D;
     final FokendLegendaryWepons plugin;
 
     IceSpearListener(FokendLegendaryWepons plugin) {
@@ -48,25 +45,26 @@ final class IceSpearListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "ice_spear")) return;
 
         e.setCancelled(true);
-        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear", CD)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "ice_spear", CD);
+        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "ice_spear");
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Ледяное копьё на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "ice_spear", CD, "Морозные пики");
+        this.plugin.cooldowns.start(p, "ice_spear", "Морозные пики");
         Location center = p.getLocation();
         World world = p.getWorld();
-        BoundingBox box = BoundingBox.of(center, RADIUS, 8.0D, RADIUS);
+        double radius = this.plugin.balance.getDouble("ice_spear.radius");
+        BoundingBox box = BoundingBox.of(center, radius, 8.0D, radius);
 
         for (Entity ent : world.getNearbyEntities(box, target -> this.plugin.isTargetable(target, p))) {
             LivingEntity le = (LivingEntity) ent;
             double dx = le.getLocation().getX() - center.getX();
             double dz = le.getLocation().getZ() - center.getZ();
-            if (dx * dx + dz * dz <= RADIUS * RADIUS) {
+            if (dx * dx + dz * dz <= radius * radius) {
                 this.plugin.spawnSpike(le.getLocation(), 1.6F);
-                le.damage(4.0D, p);
+                le.damage(this.plugin.balance.getDouble("ice_spear.damage"), p);
                 if (!this.plugin.lockStates.containsKey(le.getUniqueId())) {
                     Vector vel = le.getVelocity();
                     le.setVelocity(new Vector(vel.getX(), 0.8D, vel.getZ()));
@@ -97,10 +95,10 @@ final class IceSpearListener implements Listener {
 
         LivingEntity victim = (LivingEntity) e.getEntity();
         if (this.plugin.lockStates.containsKey(victim.getUniqueId())) return;
-        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear_freeze", FREEZE_HIT_CD)) return;
+        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear_freeze")) return;
         if (!this.plugin.lockEntity(victim, false)) return;
 
-        this.plugin.cooldowns.start(p, "ice_spear_freeze", FREEZE_HIT_CD, "Заморозка копья");
+        this.plugin.cooldowns.start(p, "ice_spear_freeze", "Заморозка копья");
         final Location anchorLoc = victim.getLocation().clone();
         Location iceLoc = anchorLoc.clone();
         iceLoc.setYaw(0.0F);

@@ -124,13 +124,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
     static final String META_TWIN = "twins_npc_owner";
     static final String META_DEATH_REASON = "legendary_death_reason";
 
-    static final long MASK_HAMMER_CD = 300000L;
-    static final int BOOMERANG_MIN_BOUNCES = 3;
-    static final int BOOMERANG_MAX_BOUNCES = 10;
-    static final long MASK_RUN_DELAY = 5000L;
-    static final long MASK_RUN_LINGER = 10000L;
-    static final int MAX_SOULS = 5;
-    static final double REVIVE_HP = 5.0D;
     static final boolean HAMMER_HITS_MOBS = false;
 
 
@@ -138,7 +131,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final MiniMessage mm = MiniMessage.miniMessage();
     final Map<UUID, UUID> raDolls = new ConcurrentHashMap<>();
     final Map<UUID, List<UUID>> activeTwins = new ConcurrentHashMap<>();
-    final CooldownManager cooldowns = new CooldownManager(this);
+    final Balance balance = new Balance(this);
+    final CooldownManager cooldowns = new CooldownManager(this, this.balance);
     private final Set<String> reportedFailures = ConcurrentHashMap.newKeySet();
     final Map<UUID, Long> maskSneakStart = new ConcurrentHashMap<>();
     final Map<UUID, Long> maskRunUntil = new ConcurrentHashMap<>();
@@ -193,6 +187,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        this.balance.reload();
         this.weaponKey = new NamespacedKey(this, "weapon_id");
         this.legacyIdKey = new NamespacedKey(this, "legendary_id");
         this.throwSessionKey = new NamespacedKey(this, "throw_session_id");
@@ -301,13 +296,13 @@ public class FokendLegendaryWepons extends JavaPlugin {
                                 FokendLegendaryWepons.this.maskSneakStart.put(id, now);
                             }
                             long elapsed = now - start;
-                            if (elapsed >= MASK_RUN_DELAY) {
+                            if (elapsed >= FokendLegendaryWepons.this.balance.seconds("default_mask.run_delay_seconds")) {
                                 if (!active) {
                                     FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                             p, Component.text("Бег активирован: +20% скорости!", NamedTextColor.GREEN));
                                     p.playSound(p.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 1.0F, 1.4F);
                                 }
-                                FokendLegendaryWepons.this.maskRunUntil.put(id, now + MASK_RUN_LINGER);
+                                FokendLegendaryWepons.this.maskRunUntil.put(id, now + FokendLegendaryWepons.this.balance.seconds("default_mask.run_linger_seconds"));
                             } else if (!active) {
                                 FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                         p,
@@ -1174,7 +1169,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         final TimeSession session = new TimeSession(ownerId, targetId);
         this.timeSessions.put(session.owner, session);
         this.timeByTarget.put(session.target, session);
-        this.cooldowns.start(owner, "time_clock", 180000L, "Часы времени");
+        this.cooldowns.start(owner, "time_clock", "Часы времени");
         this.cooldowns.sendPriorityActionBar(owner, Component.text("Часы записывают движения цели: 10 секунд...", NamedTextColor.AQUA));
         owner.getWorld().playSound(owner.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.0F, 1.8F);
 
@@ -1491,7 +1486,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
             this.setHealthModifier(victim, "soul_cap", -10.0D, false);
         }
         this.soulless.put(victimId, bowOwnerId);
-        this.souls.put(bowOwnerId, Math.min(MAX_SOULS, this.getSouls(bowOwnerId) + 1));
+        this.souls.put(bowOwnerId, Math.min(this.balance.getInt("soul_bow.max_souls"), this.getSouls(bowOwnerId) + 1));
         this.saveSouls();
         Player owner = this.getServer().getPlayer(bowOwnerId);
         if (owner != null) {
@@ -2056,11 +2051,16 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
                 "mask_block", "mask_mace", "mask_tompson", "soul_bow",
                 "death_note", "fate_scales", "fate_lightning",
-                "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled"
+                "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled", "reload"
         );
 
         @Override
         public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+            if (args.length == 1 && args[0].equalsIgnoreCase("reload") && sender.hasPermission("legendary.admin")) {
+                FokendLegendaryWepons.this.balance.reload();
+                sender.sendMessage(Component.text("config.yml перезагружен.", NamedTextColor.GREEN));
+                return true;
+            }
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("Только для игроков.");
                 return true;
@@ -2070,7 +2070,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 return true;
             }
             if (args.length < 1) {
-                p.sendMessage("Использование: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled>");
+                p.sendMessage("Использование: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled|reload>");
                 return true;
             }
             String sub = args[0].toLowerCase(Locale.ROOT);
@@ -2315,7 +2315,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
             target.teleport(reviver.getLocation());
             target.setGameMode(GameMode.SURVIVAL);
             AttributeInstance targetMax = target.getAttribute(Attribute.MAX_HEALTH);
-            target.setHealth(Math.min(REVIVE_HP, targetMax != null ? targetMax.getValue() : REVIVE_HP));
+            double reviveHp = FokendLegendaryWepons.this.balance.getDouble("revive.health");
+            target.setHealth(Math.min(reviveHp, targetMax != null ? targetMax.getValue() : reviveHp));
             target.getWorld().spawnParticle(
                     Particle.SOUL, target.getLocation().add(0.0D, 1.0D, 0.0D), 40, 0.4D, 0.8D, 0.4D, 0.05D);
             target.getWorld().playSound(target.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1.0F, 0.8F);

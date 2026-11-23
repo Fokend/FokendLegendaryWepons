@@ -58,8 +58,8 @@ final class ChaosBoomerangListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "chaos_boomerang")) return;
 
         e.setCancelled(true);
-        if (this.plugin.cooldowns.isOnCooldown(p, "chaos_boomerang", 8000L)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "chaos_boomerang", 8000L);
+        if (this.plugin.cooldowns.isOnCooldown(p, "chaos_boomerang")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "chaos_boomerang");
             this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Бумеранг на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
@@ -82,7 +82,7 @@ final class ChaosBoomerangListener implements Listener {
         }
 
         this.plugin.activeThrowSessions.add(sessionId);
-        this.plugin.cooldowns.start(p, "chaos_boomerang", 8000L, "Бумеранг хаоса");
+        this.plugin.cooldowns.start(p, "chaos_boomerang", "Бумеранг хаоса");
 
         final Location startLoc = p.getEyeLocation().subtract(0.0D, 0.3D, 0.0D);
         final World world = p.getWorld();
@@ -103,7 +103,7 @@ final class ChaosBoomerangListener implements Listener {
         world.playSound(startLoc, Sound.ENTITY_ENDER_PEARL_THROW, 1.0F, 1.3F);
 
         LivingEntity initialHoming = null;
-        if (Math.random() < 0.63D) {
+        if (Math.random() < this.plugin.balance.getDouble("chaos_boomerang.homing_chance")) {
             initialHoming = world.getNearbyEntities(p.getLocation(), 16.0D, 8.0D, 16.0D).stream()
                     .filter(LivingEntity.class::isInstance)
                     .map(LivingEntity.class::cast)
@@ -231,12 +231,12 @@ final class ChaosBoomerangListener implements Listener {
                     }
                 }
 
-                if (!this.returning && this.bounces >= FokendLegendaryWepons.BOOMERANG_MAX_BOUNCES) {
+                if (!this.returning && this.bounces >= ChaosBoomerangListener.this.plugin.balance.getInt("chaos_boomerang.max_bounces")) {
                     this.returning = true;
                 }
 
                 if (!this.returning && this.flightTicks > 100) {
-                    if (this.bounces >= FokendLegendaryWepons.BOOMERANG_MIN_BOUNCES) {
+                    if (this.bounces >= ChaosBoomerangListener.this.plugin.balance.getInt("chaos_boomerang.min_bounces")) {
                         this.returning = true;
                     } else if (this.flightTicks >= this.nextForcedBounceTick) {
                         this.direction = this.direction.clone()
@@ -296,7 +296,8 @@ final class ChaosBoomerangListener implements Listener {
                 if (hitTarget != null && !hitTarget.getUniqueId().equals(ownerId)) {
                     this.hitCooldowns.put(hitTarget.getUniqueId(), 20);
                     hitTarget.setNoDamageTicks(0);
-                    double dmg = 10.0D + Math.min(this.bounces, 10) * 2.5D;
+                    double dmg = ChaosBoomerangListener.this.plugin.balance.getDouble("chaos_boomerang.base_damage")
+                            + Math.min(this.bounces, 10) * ChaosBoomerangListener.this.plugin.balance.getDouble("chaos_boomerang.damage_per_bounce");
                     hitTarget.damage(dmg, owner);
                     PotionEffectType[] debuffs = new PotionEffectType[]{
                             PotionEffectType.SLOWNESS,
@@ -312,7 +313,7 @@ final class ChaosBoomerangListener implements Listener {
                     this.bounces++;
                     stand.teleport(hitTarget.getLocation().add(0.0D, hitTarget.getHeight() * 0.5D, 0.0D));
 
-                    if (this.bounces >= FokendLegendaryWepons.BOOMERANG_MAX_BOUNCES) {
+                    if (this.bounces >= ChaosBoomerangListener.this.plugin.balance.getInt("chaos_boomerang.max_bounces")) {
                         this.returning = true;
                     } else if (!this.returning) {
                         final LivingEntity justHit = hitTarget;
@@ -324,7 +325,7 @@ final class ChaosBoomerangListener implements Listener {
                                         && ChaosBoomerangListener.this.plugin.isTargetable(ent, owner))
                                 .min(Comparator.comparingDouble(ent -> ent.getLocation().distanceSquared(justHit.getLocation())))
                                 .orElse(null);
-                        if (nextHoming != null && Math.random() < 0.63D) {
+                        if (nextHoming != null && Math.random() < ChaosBoomerangListener.this.plugin.balance.getDouble("chaos_boomerang.homing_chance")) {
                             this.currentHomingId = nextHoming.getUniqueId();
                             Vector toNext = nextHoming.getEyeLocation().toVector().subtract(stand.getLocation().toVector());
                             if (toNext.lengthSquared() > 0.01D) {
@@ -357,7 +358,7 @@ final class ChaosBoomerangListener implements Listener {
                     this.bounces++;
                     world.playSound(hitLoc, Sound.ITEM_TRIDENT_HIT_GROUND, 1.2F, 1.0F);
                     world.spawnParticle(Particle.CRIT, hitLoc, 10, 0.2D, 0.2D, 0.2D, 0.05D);
-                    if (this.bounces >= FokendLegendaryWepons.BOOMERANG_MAX_BOUNCES) {
+                    if (this.bounces >= ChaosBoomerangListener.this.plugin.balance.getInt("chaos_boomerang.max_bounces")) {
                         this.returning = true;
                     }
                 } else {

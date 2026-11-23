@@ -1,0 +1,61 @@
+# Баланс легендарок. После правки: /legendary reload (перезапуск сервера не нужен).
+# Если ключ удалить, берётся значение по умолчанию из плагина.
+
+# Перезарядка способностей, в секундах.
+cooldowns:
+  chaos_boomerang: 8
+  ice_spear: 75          # Морозные пики (ПКМ)
+  ice_spear_freeze: 6    # заморозка при ударе копьём
+  magnet: 5
+  mask_hammer: 300       # молот Маски по умолчанию
+  mask_tompson_shot: 0.25
+  ra_blade_spawn: 60     # призыв манекена Ра
+  time_clock: 180
+  twins_summon: 30
+  warden_boom: 10        # Sonic Boom шлема Вардена
+  fate_judgement: 20     # Весы Судьбы: Верховный Суд
+  fate_good: 25
+  fate_bad: 15
+
+# Шанс, что ядро добавит зачарование при улучшении (0.0 – 1.0).
+core_upgrade_chance:
+  cb_orange: 0.10
+  cb_purple: 0.15
+  cb_green: 0.17
+
+chaos_boomerang:
+  min_bounces: 3
+  max_bounces: 10
+  homing_chance: 0.63          # шанс навестись на цель при броске и после каждого попадания
+  base_damage: 10.0
+  damage_per_bounce: 2.5       # добавка за каждый отскок, учитываются первые 10
+
+ice_spear:
+  radius: 15.0
+  damage: 4.0
+
+twins_sword:
+  damage_per_twin: 4.0
+  extra_hit_chance: 0.25
+  extra_hit_multiplier: 0.7    # доля урона удара
+
+ra_blade:
+  doll_lifetime_seconds: 45
+
+soul_bow:
+  max_souls: 5
+
+revive:
+  health: 5.0                  # здоровье после /revive (в половинках сердца)
+
+default_mask:
+  run_delay_seconds: 5         # сколько сидеть на шифте до ускорения
+  run_linger_seconds: 10
+
+scales_of_fate:
+  judgement_multiplier: 2.0
+  judgement_window_seconds: 30 # сколько ждёт усиленный удар
+  lightning_lifetime_seconds: 20
+
+death_note:
+  kill_radius: 30.0

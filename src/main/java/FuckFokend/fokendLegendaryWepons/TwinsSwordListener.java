@@ -76,14 +76,14 @@ final class TwinsSwordListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "twins_sword")) return;
 
         e.setCancelled(true);
-        if (this.plugin.cooldowns.isOnCooldown(p, "twins_summon", 30000L)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "twins_summon", 30000L);
+        if (this.plugin.cooldowns.isOnCooldown(p, "twins_summon")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "twins_summon");
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Близнецы на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "twins_summon", 30000L, "Призыв близнецов");
+        this.plugin.cooldowns.start(p, "twins_summon", "Призыв близнецов");
         List<UUID> oldTwins = this.plugin.activeTwins.remove(p.getUniqueId());
         if (oldTwins != null) {
             for (UUID oldId : oldTwins) {
@@ -314,9 +314,10 @@ final class TwinsSwordListener implements Listener {
             }
         }
 
-        boolean extra = Math.random() < 0.25D;
-        double extraDmg = e.getDamage() * 0.7D;
-        double twinDmg = validTwins * 4.0D;
+        Balance balance = this.plugin.balance;
+        boolean extra = Math.random() < balance.getDouble("twins_sword.extra_hit_chance");
+        double extraDmg = e.getDamage() * balance.getDouble("twins_sword.extra_hit_multiplier");
+        double twinDmg = validTwins * balance.getDouble("twins_sword.damage_per_twin");
         double totalBonus = twinDmg + (extra ? extraDmg : 0.0D);
 
         if (totalBonus > 0.0D) {

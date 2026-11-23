@@ -45,11 +45,6 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 final class ScalesOfFateListener implements Listener {
-   static final long CD_JUDGEMENT = 20000L;
-   static final long CD_BAD = 15000L;
-   static final long CD_GOOD = 25000L;
-   static final long LIGHTNING_LIFETIME_MS = 20000L;
-   static final long EMPOWER_LIFETIME_MS = 30000L;
    private static final List<PotionEffectType> DEBUFFS;
    private static final List<PotionEffectType> BUFFS;
    private final FokendLegendaryWepons plugin;
@@ -86,7 +81,7 @@ final class ScalesOfFateListener implements Listener {
       ItemStack item = plugin.base(Material.BLAZE_ROD, 20013, "fate_lightning", "<gradient:#fffb7d:#ff9a00><bold>⚡ Молния Судьбы</bold></gradient>", true);
       ItemMeta m = item.getItemMeta();
       plugin.setLore(m, "~Дар Хорошей Судьбы. Недолго живёт.", "", "#УДАР", "Поджигает врага и бьёт его молнией.", "Исчезает через 20 секунд.");
-      m.getPersistentDataContainer().set(new NamespacedKey(plugin, "fate_expiry"), PersistentDataType.LONG, System.currentTimeMillis() + 20000L);
+      m.getPersistentDataContainer().set(new NamespacedKey(plugin, "fate_expiry"), PersistentDataType.LONG, System.currentTimeMillis() + plugin.balance.seconds("scales_of_fate.lightning_lifetime_seconds"));
       item.setItemMeta(m);
       return item;
    }
@@ -192,18 +187,20 @@ final class ScalesOfFateListener implements Listener {
    }
 
    private void highJudgement(Player p) {
-      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_judgement", 20000L)) {
+      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_judgement")) {
          RayTraceResult r = p.getWorld().rayTraceEntities(p.getEyeLocation(), p.getEyeLocation().getDirection(), (double)20.0F, 0.6, (en) -> this.plugin.isTargetable(en, p));
          if (r != null) {
             Entity var4 = r.getHitEntity();
             if (var4 instanceof LivingEntity) {
                LivingEntity target = (LivingEntity)var4;
-               this.plugin.cooldowns.start(p, "fate_judgement", 20000L, "Верховный Суд");
+               this.plugin.cooldowns.start(p, "fate_judgement", "Верховный Суд");
                this.weighEffect(p);
                boolean left = coin();
                if (left) {
-                  this.empowered.put(p.getUniqueId(), System.currentTimeMillis() + 30000L);
-                  p.sendMessage(moira(true, "следующий удар нанесёт 2x урон (30 сек)."));
+                  long window = this.plugin.balance.seconds("scales_of_fate.judgement_window_seconds");
+                  this.empowered.put(p.getUniqueId(), System.currentTimeMillis() + window);
+                  p.sendMessage(moira(true, "следующий удар нанесёт " + formatMultiplier(this.plugin.balance.getDouble("scales_of_fate.judgement_multiplier"))
+                          + " урон (" + window / 1000L + " сек)."));
                   p.getWorld().spawnParticle(Particle.CRIT, p.getLocation().add((double)0.0F, (double)1.0F, (double)0.0F), 30, 0.4, 0.6, 0.4, 0.2);
                } else {
                   Vector kb = target.getLocation().toVector().subtract(p.getLocation().toVector());
@@ -228,8 +225,8 @@ final class ScalesOfFateListener implements Listener {
    }
 
    private void goodFate(Player p) {
-      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_good", 25000L)) {
-         this.plugin.cooldowns.start(p, "fate_good", 25000L, "Хорошая судьба");
+      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_good")) {
+         this.plugin.cooldowns.start(p, "fate_good", "Хорошая судьба");
          this.weighEffect(p);
          boolean left = coin();
          if (left) {
@@ -302,18 +299,19 @@ final class ScalesOfFateListener implements Listener {
                      if (until != null) {
                         this.empowered.remove(p.getUniqueId());
                         if (until > System.currentTimeMillis()) {
-                           e.setDamage(e.getDamage() * (double)2.0F);
-                           p.sendActionBar(Component.text("Верховный Суд: удар 2x!", NamedTextColor.GOLD));
+                           double multiplier = this.plugin.balance.getDouble("scales_of_fate.judgement_multiplier");
+                           e.setDamage(e.getDamage() * multiplier);
+                           p.sendActionBar(Component.text("Верховный Суд: удар " + formatMultiplier(multiplier) + "!", NamedTextColor.GOLD));
                            target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add((double)0.0F, (double)1.0F, (double)0.0F), 25, 0.4, (double)0.5F, 0.4, 0.3);
                            target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0F, 0.7F);
                         }
                      }
 
-                     if (this.plugin.cooldowns.isOnCooldown(p, "fate_bad", 15000L)) {
+                     if (this.plugin.cooldowns.isOnCooldown(p, "fate_bad")) {
                         return;
                      }
 
-                     this.plugin.cooldowns.start(p, "fate_bad", 15000L, "Плохая судьба");
+                     this.plugin.cooldowns.start(p, "fate_bad", "Плохая судьба");
                      this.weighEffect(p);
                      if (coin()) {
                         ThreadLocalRandom rnd = ThreadLocalRandom.current();
@@ -426,5 +424,9 @@ final class ScalesOfFateListener implements Listener {
    static {
       DEBUFFS = List.of(PotionEffectType.SLOWNESS, PotionEffectType.WEAKNESS, PotionEffectType.POISON, PotionEffectType.WITHER, PotionEffectType.BLINDNESS, PotionEffectType.NAUSEA, PotionEffectType.HUNGER, PotionEffectType.MINING_FATIGUE, PotionEffectType.DARKNESS);
       BUFFS = List.of(PotionEffectType.SPEED, PotionEffectType.STRENGTH, PotionEffectType.RESISTANCE, PotionEffectType.REGENERATION, PotionEffectType.ABSORPTION, PotionEffectType.JUMP_BOOST, PotionEffectType.FIRE_RESISTANCE, PotionEffectType.HASTE);
+   }
+
+   private static String formatMultiplier(double multiplier) {
+      return (multiplier == Math.rint(multiplier) ? String.valueOf((long) multiplier) : String.valueOf(multiplier)) + "x";
    }
 }

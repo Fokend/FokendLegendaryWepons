@@ -53,7 +53,6 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 final class WardenHelmetListener implements Listener {
-    private static final long CD = 10000L;
     final FokendLegendaryWepons plugin;
     private final Map<UUID, Long> swapCooldowns = new ConcurrentHashMap<>();
 
@@ -386,13 +385,13 @@ final class WardenHelmetListener implements Listener {
 
     private void activateSonicBoom(Player p) {
         if (this.plugin.isLocked(p)) return;
-        if (this.plugin.cooldowns.isOnCooldown(p, "warden_boom", CD)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "warden_boom", CD);
+        if (this.plugin.cooldowns.isOnCooldown(p, "warden_boom")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "warden_boom");
             this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Sonic Boom на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "warden_boom", CD, "Sonic Boom");
+        this.plugin.cooldowns.start(p, "warden_boom", "Sonic Boom");
         Location eye = p.getEyeLocation();
         World world = p.getWorld();
         Vector dir = eye.getDirection().normalize();

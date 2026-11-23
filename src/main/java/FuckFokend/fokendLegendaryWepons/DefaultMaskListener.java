@@ -136,13 +136,13 @@ final class DefaultMaskListener implements Listener {
     }
 
     private void triggerHammer(Player p) {
-        if (this.plugin.cooldowns.isOnCooldown(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD);
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_hammer")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "mask_hammer");
             this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Молот на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD, "Молот маски");
+        this.plugin.cooldowns.start(p, "mask_hammer", "Молот маски");
         float yaw = p.getLocation().getYaw();
         final Location impactLoc = p.getLocation().add(this.plugin.flatDir(yaw).multiply(3));
         final World world = impactLoc.getWorld();
@@ -233,7 +233,7 @@ final class DefaultMaskListener implements Listener {
     }
 
     private void triggerThompson(Player p) {
-        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot", 250L)) return;
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot")) return;
         this.plugin.cooldowns.startSilent(p, "mask_tompson_shot");
 
         Vector dir = p.getEyeLocation().getDirection();

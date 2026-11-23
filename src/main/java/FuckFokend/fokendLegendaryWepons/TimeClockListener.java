@@ -44,8 +44,8 @@ final class TimeClockListener implements Listener {
                 || this.plugin.lockStates.containsKey(target.getUniqueId())) {
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Эта цель уже остановлена.", NamedTextColor.RED));
-        } else if (this.plugin.cooldowns.isOnCooldown(p, "time_clock", 180000L)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "time_clock", 180000L);
+        } else if (this.plugin.cooldowns.isOnCooldown(p, "time_clock")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "time_clock");
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Часы на перезарядке: " + sec + "с", NamedTextColor.RED));
         } else {

@@ -65,7 +65,6 @@ final class DeathNoteListener implements Listener {
     static final int RULE_PAGES = 5;
     static final int WRITE_PAGES = 50; // 50 writable pages + 5 rule pages = 55 pages total
     static final int MAX_USES = 50;
-    static final double KILL_RADIUS = 30.0D;
     static final String META_DEATH_NOTE_EXECUTING = "death_note_executing";
 
     private final FokendLegendaryWepons plugin;
@@ -497,10 +496,10 @@ final class DeathNoteListener implements Listener {
 
         // 2. Try nearby mob with matching nametag (бирка) within 30 blocks
         LivingEntity nearestNamedMob = null;
-        double bestDistSq = KILL_RADIUS * KILL_RADIUS;
+        double bestDistSq = this.killRadius() * this.killRadius();
         Location ownerLoc = owner.getLocation();
 
-        for (Entity ent : owner.getWorld().getNearbyEntities(ownerLoc, KILL_RADIUS, KILL_RADIUS, KILL_RADIUS)) {
+        for (Entity ent : owner.getWorld().getNearbyEntities(ownerLoc, this.killRadius(), this.killRadius(), this.killRadius())) {
             if (!(ent instanceof LivingEntity le) || ent instanceof Player || !le.isValid() || le.isDead()) {
                 continue;
             }
@@ -521,8 +520,8 @@ final class DeathNoteListener implements Listener {
         EntityType parsedType = parseEntityType(query);
         if (parsedType != null) {
             LivingEntity nearestTypedMob = null;
-            bestDistSq = KILL_RADIUS * KILL_RADIUS;
-            for (Entity ent : owner.getWorld().getNearbyEntities(ownerLoc, KILL_RADIUS, KILL_RADIUS, KILL_RADIUS)) {
+            bestDistSq = this.killRadius() * this.killRadius();
+            for (Entity ent : owner.getWorld().getNearbyEntities(ownerLoc, this.killRadius(), this.killRadius(), this.killRadius())) {
                 if (!(ent instanceof LivingEntity le) || ent instanceof Player || !le.isValid() || le.isDead()) {
                     continue;
                 }
@@ -735,7 +734,7 @@ final class DeathNoteListener implements Listener {
     private boolean inRange(Player owner, Entity target) {
         return owner != null && target != null
                 && owner.getWorld().equals(target.getWorld())
-                && owner.getLocation().distanceSquared(target.getLocation()) <= (KILL_RADIUS * KILL_RADIUS);
+                && owner.getLocation().distanceSquared(target.getLocation()) <= (this.killRadius() * this.killRadius());
     }
 
     private void execute(UUID ownerId, ResolvedTarget target, String rawQuery) {
@@ -942,5 +941,9 @@ final class DeathNoteListener implements Listener {
                 }
             }
         }.runTaskTimer(this.plugin, 20L, 5L);
+    }
+
+    private double killRadius() {
+        return this.plugin.balance.getDouble("death_note.kill_radius");
     }
 }

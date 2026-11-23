@@ -37,8 +37,6 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 final class RaBladeListener implements Listener {
-    private static final long DOLL_LIFETIME_TICKS = 900L;
-    private static final long CD = 60000L;
     private static final long REFLECT_CD_MS = 400L;
     final FokendLegendaryWepons plugin;
     private boolean reflecting = false;
@@ -74,14 +72,14 @@ final class RaBladeListener implements Listener {
             return;
         }
 
-        if (this.plugin.cooldowns.isOnCooldown(p, "ra_blade_spawn", CD)) {
-            long sec = this.plugin.cooldowns.remainingSeconds(p, "ra_blade_spawn", CD);
+        if (this.plugin.cooldowns.isOnCooldown(p, "ra_blade_spawn")) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "ra_blade_spawn");
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Клинок Ра на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.cooldowns.start(p, "ra_blade_spawn", CD, "Призыв манекена Ра");
+        this.plugin.cooldowns.start(p, "ra_blade_spawn", "Призыв манекена Ра");
         Vector forward = this.plugin.flatDir(p.getLocation().getYaw());
         Location eyeFrom = p.getLocation().add(0.0D, 1.0D, 0.0D);
         RayTraceResult wall = p.getWorld().rayTraceBlocks(eyeFrom, forward, 1.8D, FluidCollisionMode.NEVER, true);
@@ -153,7 +151,7 @@ final class RaBladeListener implements Listener {
                     }
                 }
             }
-        }.runTaskLater(this.plugin, DOLL_LIFETIME_TICKS);
+        }.runTaskLater(this.plugin, this.plugin.balance.ticks("ra_blade.doll_lifetime_seconds"));
     }
 
     @EventHandler
