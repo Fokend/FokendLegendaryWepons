@@ -37,10 +37,10 @@ final class TimeClockListener implements Listener {
         if (!this.plugin.isTargetable(e.getEntity(), p)) return;
 
         LivingEntity target = (LivingEntity) e.getEntity();
-        if (this.plugin.timeSessions.containsKey(p.getUniqueId())) {
+        if (this.plugin.timeClock.timeSessions.containsKey(p.getUniqueId())) {
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Часы уже заняты. Верните время (ПКМ).", NamedTextColor.RED));
-        } else if (this.plugin.timeByTarget.containsKey(target.getUniqueId())
+        } else if (this.plugin.timeClock.timeByTarget.containsKey(target.getUniqueId())
                 || this.plugin.lockStates.containsKey(target.getUniqueId())) {
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Эта цель уже остановлена.", NamedTextColor.RED));
@@ -49,7 +49,7 @@ final class TimeClockListener implements Listener {
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Часы на перезарядке: " + sec + "с", NamedTextColor.RED));
         } else {
-            this.plugin.startTimeSession(p, target);
+            this.plugin.timeClock.startTimeSession(p, target);
         }
     }
 
@@ -64,7 +64,7 @@ final class TimeClockListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "time_clock")) return;
 
         e.setCancelled(true);
-        FokendLegendaryWepons.TimeSession session = this.plugin.timeSessions.get(p.getUniqueId());
+        TimeClockSessions.TimeSession session = this.plugin.timeClock.timeSessions.get(p.getUniqueId());
         if (session == null) {
             this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("ЛКМ по сущности, чтобы остановить её во времени.", NamedTextColor.GRAY));
@@ -73,7 +73,7 @@ final class TimeClockListener implements Listener {
                     p, Component.text("Идёт запись движений цели...", NamedTextColor.YELLOW));
         } else {
             int frameNum = session.index + 1;
-            this.plugin.endTimeSession(
+            this.plugin.timeClock.endTimeSession(
                     session, "Время запущено (кадр " + frameNum + "/" + session.frames.size() + ").");
             p.getWorld().playSound(p.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1.0F, 1.4F);
         }
@@ -82,7 +82,7 @@ final class TimeClockListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onHeld(PlayerItemHeldEvent e) {
         Player p = e.getPlayer();
-        FokendLegendaryWepons.TimeSession session = this.plugin.timeSessions.get(p.getUniqueId());
+        TimeClockSessions.TimeSession session = this.plugin.timeClock.timeSessions.get(p.getUniqueId());
         if (session != null && session.frozen) {
             if (this.plugin.isLegendary(
                     p.getInventory().getItem(e.getPreviousSlot()), FokendLegendaryWepons.ID_TIME_CLOCK)) {
@@ -95,7 +95,7 @@ final class TimeClockListener implements Listener {
                 }
                 if (diff != 0) {
                     int step = p.isSneaking() ? 10 : 1;
-                    this.plugin.scrubTime(session, p, diff * step);
+                    this.plugin.timeClock.scrubTime(session, p, diff * step);
                 }
             }
         }
@@ -103,7 +103,7 @@ final class TimeClockListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onFrozenRegen(EntityRegainHealthEvent e) {
-        FokendLegendaryWepons.TimeSession session = this.plugin.timeByTarget.get(e.getEntity().getUniqueId());
+        TimeClockSessions.TimeSession session = this.plugin.timeClock.timeByTarget.get(e.getEntity().getUniqueId());
         if (session != null && session.frozen) {
             e.setCancelled(true);
         }
@@ -112,8 +112,8 @@ final class TimeClockListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onFrozenMove(PlayerMoveEvent e) {
         UUID id = e.getPlayer().getUniqueId();
-        if (!this.plugin.timeTeleporting.contains(id)) {
-            FokendLegendaryWepons.TimeSession session = this.plugin.timeByTarget.get(id);
+        if (!this.plugin.timeClock.timeTeleporting.contains(id)) {
+            TimeClockSessions.TimeSession session = this.plugin.timeClock.timeByTarget.get(id);
             if (session != null && session.frozen) {
                 Location from = e.getFrom();
                 Location to = e.getTo();

@@ -33,10 +33,10 @@ final class CleanupListener implements Listener {
     }
 
     private void dropSessions(UUID id) {
-        FokendLegendaryWepons.TimeSession so = plugin.timeSessions.get(id);
-        if (so != null) plugin.endTimeSession(so, null);
-        FokendLegendaryWepons.TimeSession st = plugin.timeByTarget.get(id);
-        if (st != null) plugin.endTimeSession(st, "Цель покинула игру.");
+        TimeClockSessions.TimeSession so = plugin.timeClock.timeSessions.get(id);
+        if (so != null) plugin.timeClock.endTimeSession(so, null);
+        TimeClockSessions.TimeSession st = plugin.timeClock.timeByTarget.get(id);
+        if (st != null) plugin.timeClock.endTimeSession(st, "Цель покинула игру.");
         plugin.unlockEntity(id);
     }
 

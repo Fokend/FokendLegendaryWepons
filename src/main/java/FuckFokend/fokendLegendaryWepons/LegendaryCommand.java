@@ -57,13 +57,13 @@ final class LegendaryCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("fix")) {
             UUID id = p.getUniqueId();
-            FokendLegendaryWepons.TimeSession sOwner = this.plugin.timeSessions.get(id);
+            TimeClockSessions.TimeSession sOwner = this.plugin.timeClock.timeSessions.get(id);
             if (sOwner != null) {
-                this.plugin.endTimeSession(sOwner, null);
+                this.plugin.timeClock.endTimeSession(sOwner, null);
             }
-            FokendLegendaryWepons.TimeSession sTarget = this.plugin.timeByTarget.get(id);
+            TimeClockSessions.TimeSession sTarget = this.plugin.timeClock.timeByTarget.get(id);
             if (sTarget != null) {
-                this.plugin.endTimeSession(sTarget, null);
+                this.plugin.timeClock.endTimeSession(sTarget, null);
             }
             this.plugin.unlockEntity(id);
             this.plugin.releaseHover(p);

@@ -59,7 +59,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Transformation;
@@ -123,6 +122,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Balance balance = new Balance(this);
     final LegendaryItems items = new LegendaryItems(this);
     final RecipeManager recipes = new RecipeManager(this);
+    final TimeClockSessions timeClock = new TimeClockSessions(this);
     final CooldownManager cooldowns = new CooldownManager(this, this.balance);
     private final Set<String> reportedFailures = ConcurrentHashMap.newKeySet();
     final Map<UUID, Long> maskSneakStart = new ConcurrentHashMap<>();
@@ -135,9 +135,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Map<UUID, ThrownBoomerang> boomerangs = new ConcurrentHashMap<>();
     final Set<String> activeThrowSessions = ConcurrentHashMap.newKeySet();
     final Map<UUID, LockState> lockStates = new ConcurrentHashMap<>();
-    final Map<UUID, TimeSession> timeSessions = new ConcurrentHashMap<>();
-    final Map<UUID, TimeSession> timeByTarget = new ConcurrentHashMap<>();
-    final Set<UUID> timeTeleporting = ConcurrentHashMap.newKeySet();
     final Map<UUID, Integer> souls = new ConcurrentHashMap<>();
     final Map<UUID, UUID> soulless = new ConcurrentHashMap<>();
     final Map<UUID, UUID> revived = new ConcurrentHashMap<>();
@@ -396,8 +393,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
     }
 
     public void restoreAllEntities() {
-        for (TimeSession session : new ArrayList<>(this.timeSessions.values())) {
-            this.endTimeSession(session, null);
+        for (TimeClockSessions.TimeSession session : new ArrayList<>(this.timeClock.timeSessions.values())) {
+            this.timeClock.endTimeSession(session, null);
         }
         for (UUID id : new ArrayList<>(this.lockStates.keySet())) {
             this.unlockEntity(id);
@@ -1041,129 +1038,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
         }
     }
 
-    void startTimeSession(Player owner, LivingEntity target) {
-        final UUID ownerId = owner.getUniqueId();
-        final UUID targetId = target.getUniqueId();
-        final TimeSession session = new TimeSession(ownerId, targetId);
-        this.timeSessions.put(session.owner, session);
-        this.timeByTarget.put(session.target, session);
-        this.cooldowns.start(owner, "time_clock", "Часы времени");
-        this.cooldowns.sendPriorityActionBar(owner, Component.text("Часы записывают движения цели: 10 секунд...", NamedTextColor.AQUA));
-        owner.getWorld().playSound(owner.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.0F, 1.8F);
-
-        session.recordTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                Entity ent = FokendLegendaryWepons.this.getServer().getEntity(targetId);
-                Player pl = FokendLegendaryWepons.this.getServer().getPlayer(ownerId);
-                if (ent instanceof LivingEntity le && le.isValid() && !le.isDead() && pl != null && pl.isOnline()) {
-                    session.frames.add(new TimeFrame(le.getLocation().clone(), le.getHealth()));
-                    if (session.frames.size() >= 200) {
-                        this.cancel();
-                        FokendLegendaryWepons.this.beginTimeFreeze(session, pl, le);
-                    }
-                    return;
-                }
-                FokendLegendaryWepons.this.endTimeSession(session, "Запись прервана: цель потеряна.");
-            }
-        }.runTaskTimer(this, 0L, 1L);
-    }
-
-    void beginTimeFreeze(TimeSession session, Player owner, LivingEntity target) {
-        if (!this.lockEntity(target, true)) {
-            this.endTimeSession(session, "Не удалось остановить цель.");
-        } else {
-            session.frozen = true;
-            session.index = session.frames.size() - 1;
-            target.getWorld().spawnParticle(
-                    Particle.END_ROD, target.getLocation().add(0.0D, 1.0D, 0.0D), 40, 0.4D, 0.8D, 0.4D, 0.05D);
-            target.getWorld().playSound(target.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 1.0F, 0.5F);
-            if (owner != null && owner.isOnline()) {
-                this.cooldowns.sendPriorityActionBar(
-                        owner,
-                        Component.text("Время остановлено! Колёсико: листать кадры, ПКМ: вернуть время.", NamedTextColor.AQUA));
-            }
-            session.timeoutTask = this.getServer().getScheduler().runTaskLater(
-                    this, () -> this.endTimeSession(session, "Время цели возобновилось само."), 3600L);
-        }
-    }
-
-    void applyTimeFrame(Entity target, TimeFrame frame) {
-        if (target == null || frame == null || !target.isValid() || target.isDead()) return;
-        UUID targetId = target.getUniqueId();
-        if (target instanceof Player) {
-            this.timeTeleporting.add(targetId);
-        }
-        boolean teleported;
-        try {
-            teleported = target.teleport(frame.location());
-        } finally {
-            this.timeTeleporting.remove(targetId);
-        }
-        if (teleported && target instanceof LivingEntity le && !le.isDead()) {
-            AttributeInstance maxAttr = le.getAttribute(Attribute.MAX_HEALTH);
-            double maxHp = maxAttr == null ? le.getHealth() : maxAttr.getValue();
-            le.setHealth(Math.max(0.5D, Math.min(frame.health(), maxHp)));
-        }
-    }
-
-    void endTimeSession(TimeSession session, String message) {
-        if (session.recordTask != null) {
-            session.recordTask.cancel();
-        }
-        if (session.timeoutTask != null) {
-            session.timeoutTask.cancel();
-        }
-        this.timeSessions.remove(session.owner);
-        this.timeByTarget.remove(session.target);
-        if (session.frozen) {
-            Entity target = this.getServer().getEntity(session.target);
-            if (target != null && !session.frames.isEmpty()
-                    && session.index >= 0 && session.index < session.frames.size()) {
-                this.applyTimeFrame(target, session.frames.get(session.index));
-            }
-            this.unlockEntity(session.target);
-            if (target != null) {
-                target.getWorld().spawnParticle(
-                        Particle.END_ROD, target.getLocation().add(0.0D, 1.0D, 0.0D), 25, 0.3D, 0.6D, 0.3D, 0.05D);
-            }
-        }
-        session.frozen = false;
-        Player owner = this.getServer().getPlayer(session.owner);
-        if (owner != null && message != null) {
-            this.cooldowns.sendPriorityActionBar(owner, Component.text(message, NamedTextColor.YELLOW));
-        }
-    }
-
-    void scrubTime(TimeSession session, Player owner, int delta) {
-        if (!session.frames.isEmpty()) {
-            Entity target = this.getServer().getEntity(session.target);
-            if (target != null && target.isValid() && !target.isDead()) {
-                session.index = Math.max(0, Math.min(session.frames.size() - 1, session.index + delta));
-                TimeFrame frame = session.frames.get(session.index);
-                this.applyTimeFrame(target, frame);
-                double secondsBack = (session.frames.size() - 1 - session.index) / 20.0D;
-                this.cooldowns.sendPriorityActionBar(
-                        owner,
-                        Component.text(
-                                String.format(
-                                        Locale.US,
-                                        "Кадр %d/%d (-%.2f с)",
-                                        session.index + 1,
-                                        session.frames.size(),
-                                        secondsBack),
-                                NamedTextColor.AQUA));
-                owner.playSound(
-                        owner.getLocation(),
-                        Sound.BLOCK_NOTE_BLOCK_HAT,
-                        0.5F,
-                        1.0F + (float) session.index / (float) session.frames.size());
-            } else {
-                this.endTimeSession(session, "Цель потеряна.");
-            }
-        }
-    }
-
     int getSouls(UUID id) {
         return this.souls.getOrDefault(id, 0);
     }
@@ -1381,24 +1255,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
     }
 
     static record LockState(boolean ai, boolean gravity, boolean invulnerable) {
-    }
-
-    static final class TimeSession {
-        final UUID owner;
-        final UUID target;
-        final List<TimeFrame> frames = new ArrayList<>();
-        BukkitTask recordTask;
-        BukkitTask timeoutTask;
-        boolean frozen = false;
-        int index = 0;
-
-        TimeSession(UUID owner, UUID target) {
-            this.owner = owner;
-            this.target = target;
-        }
-    }
-
-    static record TimeFrame(Location location, double health) {
     }
 
 }

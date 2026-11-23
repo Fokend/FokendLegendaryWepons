@@ -46,7 +46,7 @@ final class FreezeListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onMove(PlayerMoveEvent e) {
-        if (plugin.timeTeleporting.contains(e.getPlayer().getUniqueId())
+        if (plugin.timeClock.timeTeleporting.contains(e.getPlayer().getUniqueId())
                 || !plugin.lockStates.containsKey(e.getPlayer().getUniqueId())) return;
         Location from = e.getFrom();
         Location to = e.getTo();
@@ -61,7 +61,7 @@ final class FreezeListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent e) {
-        if (plugin.timeTeleporting.contains(e.getPlayer().getUniqueId())
+        if (plugin.timeClock.timeTeleporting.contains(e.getPlayer().getUniqueId())
                 || !plugin.lockStates.containsKey(e.getPlayer().getUniqueId())) return;
         TeleportCause cause = e.getCause();
         if (cause == TeleportCause.ENDER_PEARL || cause == TeleportCause.CHORUS_FRUIT) {
