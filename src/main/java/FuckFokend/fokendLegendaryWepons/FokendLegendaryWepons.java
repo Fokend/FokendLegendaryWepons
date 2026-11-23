@@ -133,8 +133,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
     static final double REVIVE_HP = 5.0D;
     static final boolean HAMMER_HITS_MOBS = false;
 
-    public static NamespacedKey KEY;
-    private static FokendLegendaryWepons instance;
 
     final Object fileLock = new Object();
     final MiniMessage mm = MiniMessage.miniMessage();
@@ -165,8 +163,10 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Map<UUID, Integer> lastThompsonHitTick = new ConcurrentHashMap<>();
 
     File soulFile;
-    NamespacedKey idKey;
+    /** The one key that marks an item as a legendary; its value is the legendary id. */
     NamespacedKey weaponKey;
+    /** Older builds also wrote the id here. Read only to migrate old items, see {@link #migrateLegacyId}. */
+    NamespacedKey legacyIdKey;
     NamespacedKey throwSessionKey;
     NamespacedKey frozenKey;
     NamespacedKey runKey;
@@ -191,16 +191,10 @@ public class FokendLegendaryWepons extends JavaPlugin {
             "twins_sword", "magnet", "death_note", "fate_scales"
     );
 
-    public FokendLegendaryWepons() {
-        instance = this;
-    }
-
     @Override
     public void onEnable() {
-        instance = this;
-        this.idKey = new NamespacedKey(this, "legendary_id");
         this.weaponKey = new NamespacedKey(this, "weapon_id");
-        KEY = this.weaponKey;
+        this.legacyIdKey = new NamespacedKey(this, "legendary_id");
         this.throwSessionKey = new NamespacedKey(this, "throw_session_id");
         this.frozenKey = new NamespacedKey(this, "time_frozen");
         this.runKey = new NamespacedKey(this, "mask_run");
@@ -229,6 +223,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         pm.registerEvents(new EntityRightClickBridge(this), this);
         pm.registerEvents(new DeathNoteListener(this), this);
         pm.registerEvents(new ScalesOfFateListener(this), this);
+        pm.registerEvents(new LegacyItemMigrationListener(this), this);
 
         PluginCommand legendaryCmd = this.getCommand("legendary");
         final LegendaryCommand legendaryExec = new LegendaryCommand();
@@ -539,33 +534,12 @@ public class FokendLegendaryWepons extends JavaPlugin {
         ItemMeta meta = copy.getItemMeta();
         if (meta != null) {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            if (this.idKey != null) pdc.remove(this.idKey);
-            if (this.weaponKey != null) pdc.remove(this.weaponKey);
+            pdc.remove(this.weaponKey);
+            pdc.remove(this.legacyIdKey);
             if (this.throwSessionKey != null) pdc.remove(this.throwSessionKey);
             copy.setItemMeta(meta);
         }
         return copy;
-    }
-
-    public static boolean isWeapon(ItemStack item, String id) {
-        if (item != null && !item.getType().isAir() && item.hasItemMeta()) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta == null) {
-                return false;
-            }
-            PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            if (KEY != null) {
-                String val = pdc.get(KEY, PersistentDataType.STRING);
-                if (id.equals(val)) {
-                    return true;
-                }
-            }
-            if (instance != null && instance.idKey != null) {
-                String val = pdc.get(instance.idKey, PersistentDataType.STRING);
-                return id.equals(val);
-            }
-        }
-        return false;
     }
 
     /**
@@ -601,54 +575,68 @@ public class FokendLegendaryWepons extends JavaPlugin {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            if (this.idKey != null) {
-                pdc.set(this.idKey, PersistentDataType.STRING, id);
-            }
-            if (this.weaponKey != null) {
-                pdc.set(this.weaponKey, PersistentDataType.STRING, id);
-            }
+            pdc.set(this.weaponKey, PersistentDataType.STRING, id);
+            pdc.remove(this.legacyIdKey);
             item.setItemMeta(meta);
         }
     }
 
     String getId(ItemStack item) {
-        if (item != null && !item.getType().isAir() && item.hasItemMeta()) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta == null) {
-                return null;
-            }
-            PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            if (this.weaponKey != null) {
-                String val = pdc.get(this.weaponKey, PersistentDataType.STRING);
-                if (val != null) {
-                    return val;
-                }
-            }
-            if (this.idKey != null) {
-                String val = pdc.get(this.idKey, PersistentDataType.STRING);
-                if (val != null) {
-                    return val;
-                }
-            }
-            for (NamespacedKey k : pdc.getKeys()) {
-                if ("legendaryweapons".equals(k.getNamespace()) && "weapon".equals(k.getKey())) {
-                    String legacy = pdc.get(k, PersistentDataType.STRING);
-                    if (legacy != null) {
-                        return switch (legacy) {
-                            case "warden" -> ID_WARDEN_HELMET;
-                            case "ra" -> ID_RA_BLADE;
-                            case "chaos" -> ID_CHAOS_BOOMERANG;
-                            case "twins" -> ID_TWINS_SWORD;
-                            case "magnet" -> ID_MAGNET;
-                            default -> legacy;
-                        };
-                    }
-                }
-            }
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return null;
         }
-        return null;
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        String id = pdc.get(this.weaponKey, PersistentDataType.STRING);
+        // Items that have not been through migrateLegacyId yet (e.g. sitting in an unopened chest).
+        return id != null ? id : this.legacyId(pdc);
     }
 
+    /**
+     * Rewrites an item that still carries an id under one of the old keys so that it carries it under
+     * {@link #weaponKey} only. Returns true when the item was changed.
+     */
+    boolean migrateLegacyId(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        NamespacedKey oldestKey = new NamespacedKey("legendaryweapons", "weapon");
+        if (!pdc.has(this.legacyIdKey) && !pdc.has(oldestKey)) {
+            return false;
+        }
+        String id = pdc.get(this.weaponKey, PersistentDataType.STRING);
+        if (id == null) {
+            id = this.legacyId(pdc);
+        }
+        pdc.remove(this.legacyIdKey);
+        pdc.remove(oldestKey);
+        if (id != null) {
+            pdc.set(this.weaponKey, PersistentDataType.STRING, id);
+        }
+        item.setItemMeta(meta);
+        return true;
+    }
+
+    private String legacyId(PersistentDataContainer pdc) {
+        String id = pdc.get(this.legacyIdKey, PersistentDataType.STRING);
+        if (id != null) {
+            return id;
+        }
+        // The original LegendaryWeapons plugin, before this one replaced it.
+        String oldest = pdc.get(new NamespacedKey("legendaryweapons", "weapon"), PersistentDataType.STRING);
+        if (oldest == null) {
+            return null;
+        }
+        return switch (oldest) {
+            case "warden" -> ID_WARDEN_HELMET;
+            case "ra" -> ID_RA_BLADE;
+            case "chaos" -> ID_CHAOS_BOOMERANG;
+            case "twins" -> ID_TWINS_SWORD;
+            case "magnet" -> ID_MAGNET;
+            default -> oldest;
+        };
+    }
 
     /**
      * Kill switch check for ability triggers. Item protections and passive bookkeeping do not call this,
@@ -703,7 +691,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
 
     boolean isLegendary(ItemStack item, String id) {
         if (item != null && item.hasItemMeta()) {
-            return isWeapon(item, id) || id.equals(this.getId(item));
+            return id.equals(this.getId(item));
         }
         return false;
     }
