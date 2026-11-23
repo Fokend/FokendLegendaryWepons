@@ -105,7 +105,7 @@ final class IceSpearListener implements Listener {
         iceLoc.setPitch(0.0F);
         ItemDisplay iceDisplay = this.plugin.spawnModel(
                 iceLoc.clone().add(0.0D, 1.0D, 0.0D),
-                this.plugin.iceSpearIce(),
+                this.plugin.items.iceSpearIce(),
                 new Vector3f(0.0F, 0.0F, 0.0F),
                 new Vector3f(1.5F, 1.5F, 1.5F));
 

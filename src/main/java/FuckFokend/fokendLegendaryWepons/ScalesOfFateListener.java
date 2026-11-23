@@ -70,17 +70,17 @@ final class ScalesOfFateListener implements Listener {
    }
 
    static ItemStack createScales(FokendLegendaryWepons plugin) {
-      ItemStack item = plugin.base(Material.NETHERITE_SWORD, 20012, "fate_scales", "<gradient:#f9d423:#8e2de2><bold>⚖ Весы Судьбы</bold></gradient>", true);
+      ItemStack item = plugin.items.base(Material.NETHERITE_SWORD, 20012, "fate_scales", "<gradient:#f9d423:#8e2de2><bold>⚖ Весы Судьбы</bold></gradient>", true);
       ItemMeta m = item.getItemMeta();
-      plugin.setLore(m, "~Говорят... владельца преследуют те, чьи судьбы были предрешены Весами.", "", "#ВЕРХОВНЫЙ СУД (SHIFT+ПКМ, кд 20с)", "Левый мойр: следующий удар наносит 2x урон.", "Правый мойр: Милосердие — отбрасывает противника, слабый урон.", "#ПЛОХАЯ СУДЬБА (ЛКМ по врагу, кд 15с)", "Левый мойр: случайный дебафф случайного уровня.", "Правый мойр: подсвечивает врага и бьёт молнией.", "#ХОРОШАЯ СУДЬБА (ПКМ, кд 25с)", "Левый мойр: баффы владельцу.", "Правый мойр: предмет «Молния» на 20 секунд.");
+      plugin.items.setLore(m, "~Говорят... владельца преследуют те, чьи судьбы были предрешены Весами.", "", "#ВЕРХОВНЫЙ СУД (SHIFT+ПКМ, кд 20с)", "Левый мойр: следующий удар наносит 2x урон.", "Правый мойр: Милосердие — отбрасывает противника, слабый урон.", "#ПЛОХАЯ СУДЬБА (ЛКМ по врагу, кд 15с)", "Левый мойр: случайный дебафф случайного уровня.", "Правый мойр: подсвечивает врага и бьёт молнией.", "#ХОРОШАЯ СУДЬБА (ПКМ, кд 25с)", "Левый мойр: баффы владельцу.", "Правый мойр: предмет «Молния» на 20 секунд.");
       item.setItemMeta(m);
       return item;
    }
 
    static ItemStack createLightning(FokendLegendaryWepons plugin) {
-      ItemStack item = plugin.base(Material.BLAZE_ROD, 20013, "fate_lightning", "<gradient:#fffb7d:#ff9a00><bold>⚡ Молния Судьбы</bold></gradient>", true);
+      ItemStack item = plugin.items.base(Material.BLAZE_ROD, 20013, "fate_lightning", "<gradient:#fffb7d:#ff9a00><bold>⚡ Молния Судьбы</bold></gradient>", true);
       ItemMeta m = item.getItemMeta();
-      plugin.setLore(m, "~Дар Хорошей Судьбы. Недолго живёт.", "", "#УДАР", "Поджигает врага и бьёт его молнией.", "Исчезает через 20 секунд.");
+      plugin.items.setLore(m, "~Дар Хорошей Судьбы. Недолго живёт.", "", "#УДАР", "Поджигает врага и бьёт его молнией.", "Исчезает через 20 секунд.");
       m.getPersistentDataContainer().set(new NamespacedKey(plugin, "fate_expiry"), PersistentDataType.LONG, System.currentTimeMillis() + plugin.balance.seconds("scales_of_fate.lightning_lifetime_seconds"));
       item.setItemMeta(m);
       return item;

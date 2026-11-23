@@ -118,7 +118,7 @@ final class RaBladeListener implements Listener {
                 as.getEquipment().setChestplate(new ItemStack(Material.GOLDEN_CHESTPLATE));
                 as.getEquipment().setLeggings(new ItemStack(Material.GOLDEN_LEGGINGS));
                 as.getEquipment().setBoots(new ItemStack(Material.GOLDEN_BOOTS));
-                as.getEquipment().setItemInMainHand(this.plugin.visualCopy(this.plugin.raBlade()));
+                as.getEquipment().setItemInMainHand(this.plugin.visualCopy(this.plugin.items.raBlade()));
             }
         }));
 

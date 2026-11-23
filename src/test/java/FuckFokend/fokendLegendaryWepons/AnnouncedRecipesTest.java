@@ -49,7 +49,7 @@ class AnnouncedRecipesTest extends PluginTestBase {
         assertMaterial(m, 'I', Material.NETHERITE_INGOT);
         RecipeChoice core = m.get('C');
         assertInstanceOf(RecipeChoice.ExactChoice.class, core);
-        assertTrue(core.test(this.plugin.cbOrange()), "centre must accept the Impulse Core");
+        assertTrue(core.test(this.plugin.items.cbOrange()), "centre must accept the Impulse Core");
     }
 
     @Test

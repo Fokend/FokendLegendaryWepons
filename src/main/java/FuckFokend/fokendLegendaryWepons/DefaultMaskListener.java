@@ -68,7 +68,7 @@ final class DefaultMaskListener implements Listener {
             boolean sameCmd = meta.hasCustomModelData() && meta.getCustomModelData() == cmd;
             Component expectedName = this.plugin.mm.deserialize(title).decoration(TextDecoration.ITALIC, false);
             if (!sameCmd || !meta.hasDisplayName() || !expectedName.equals(meta.displayName())) {
-                this.plugin.applyCustomModelData(meta, cmd);
+                this.plugin.items.applyCustomModelData(meta, cmd);
                 meta.displayName(expectedName);
                 item.setItemMeta(meta);
             }
@@ -153,7 +153,7 @@ final class DefaultMaskListener implements Listener {
         startAbove.setPitch(0.0F);
 
         ItemDisplay hammerDisplay = this.plugin.track(world.spawn(startAbove, ItemDisplay.class, d -> {
-            d.setItemStack(this.plugin.maskMace());
+            d.setItemStack(this.plugin.items.maskMace());
             d.setItemDisplayTransform(ItemDisplayTransform.FIXED);
             d.setPersistent(false);
             d.setBrightness(new Display.Brightness(15, 15));
@@ -254,7 +254,7 @@ final class DefaultMaskListener implements Listener {
         final List<UUID> gunIds = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
             ItemDisplay disp = this.plugin.track(p.getWorld().spawn(p.getEyeLocation(), ItemDisplay.class, d -> {
-                d.setItemStack(this.plugin.maskThompson());
+                d.setItemStack(this.plugin.items.maskThompson());
                 d.setItemDisplayTransform(ItemDisplayTransform.FIXED);
                 d.setPersistent(false);
                 d.setBrightness(new Display.Brightness(15, 15));

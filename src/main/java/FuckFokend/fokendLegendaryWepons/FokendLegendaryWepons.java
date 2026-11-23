@@ -18,10 +18,8 @@ import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
-import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
@@ -34,7 +32,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
@@ -52,12 +49,8 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.RecipeChoice;
-import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -109,9 +102,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
     static final int CMD_MASK_MACE = 20008;
     static final int CMD_MASK_TOMPSON = 20009;
     static final int CMD_SOUL_BOW = 20010;
-    private static final int CMD_CB_ORANGE = 30001;
-    private static final int CMD_CB_PURPLE = 30002;
-    private static final int CMD_CB_GREEN = 30003;
+    static final int CMD_CB_ORANGE = 30001;
+    static final int CMD_CB_PURPLE = 30002;
+    static final int CMD_CB_GREEN = 30003;
 
     static final String META_TOMPSON = "mask_explosive";
     static final String META_SOUL_ARROW = "soul_arrow";
@@ -128,6 +121,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Map<UUID, UUID> raDolls = new ConcurrentHashMap<>();
     final Map<UUID, List<UUID>> activeTwins = new ConcurrentHashMap<>();
     final Balance balance = new Balance(this);
+    final LegendaryItems items = new LegendaryItems(this);
+    final RecipeManager recipes = new RecipeManager(this);
     final CooldownManager cooldowns = new CooldownManager(this, this.balance);
     private final Set<String> reportedFailures = ConcurrentHashMap.newKeySet();
     final Map<UUID, Long> maskSneakStart = new ConcurrentHashMap<>();
@@ -246,8 +241,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
             this.getServer().getCommandMap().register("fokendlegendary", fallback);
         }
 
-        this.registerRecipes();
-        this.logRecipes();
+        this.recipes.registerRecipes();
+        this.recipes.logRecipes();
         this.getLogger().info("FokendLegendaryWepons " + this.getPluginMeta().getVersion()
                 + ": 10 легендарок (Клинок Ра, Бумеранг Хаоса, Шлем Вардена, Меч Близнецов, Магнитник,"
                 + " Часы, Морозное копьё, Маска, Томпсон, Лук Душ) + Тетрадь Смерти, Весы Судьбы, 3 ядра.");
@@ -687,119 +682,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
         return false;
     }
 
-    Attribute attackDamageAttribute() {
-        Attribute attr = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("attack_damage"));
-        return attr != null ? attr : Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_damage"));
-    }
-
-    void applyBaseDamage(ItemStack item, double amount, String id) {
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            Attribute attr = this.attackDamageAttribute();
-            if (attr != null) {
-                AttributeModifier mod = new AttributeModifier(
-                        new NamespacedKey(this, "legendary_dmg_" + id),
-                        amount,
-                        Operation.ADD_NUMBER,
-                        EquipmentSlotGroup.MAINHAND);
-                meta.addAttributeModifier(attr, mod);
-                item.setItemMeta(meta);
-            }
-        }
-    }
-
-    void setLore(ItemMeta meta, String... lines) {
-        List<Component> lore = new ArrayList<>();
-        lore.add(Component.text("✦ ЛЕГЕНДАРНЫЙ АРТЕФАКТ ✦", NamedTextColor.LIGHT_PURPLE)
-                .decorate(TextDecoration.BOLD)
-                .decoration(TextDecoration.ITALIC, false));
-        lore.add(Component.empty());
-
-        for (String line : lines) {
-            if (line.isEmpty()) {
-                lore.add(Component.empty());
-            } else if (line.startsWith("~")) {
-                lore.add(Component.text(line.substring(1))
-                        .color(NamedTextColor.DARK_PURPLE)
-                        .decoration(TextDecoration.ITALIC, true));
-            } else if (line.startsWith("#")) {
-                lore.add(Component.text(line.substring(1))
-                        .color(NamedTextColor.LIGHT_PURPLE)
-                        .decorate(TextDecoration.BOLD)
-                        .decoration(TextDecoration.ITALIC, false));
-            } else {
-                lore.add(Component.text(line)
-                        .color(NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
-        }
-        meta.lore(lore);
-    }
-
-    @SuppressWarnings("deprecation")
-    void applyCustomModelData(ItemMeta meta, int cmd) {
-        try {
-            meta.setCustomModelData(cmd);
-        } catch (Throwable ignored) {
-        }
-        try {
-            CustomModelDataComponent comp = meta.getCustomModelDataComponent();
-            comp.setFloats(List.of((float) cmd));
-            meta.setCustomModelDataComponent(comp);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    ItemStack base(Material mat, int cmd, String id, String title, boolean applySwordDamage) {
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) {
-            return item;
-        }
-        this.applyCustomModelData(meta, cmd);
-        if (title.contains("<")) {
-            meta.displayName(this.mm.deserialize(title).decoration(TextDecoration.ITALIC, false));
-        } else {
-            String[] style = switch (id) {
-                case "ra_god_blade" -> new String[]{"#fff3a3", "#ff8c00", "☀"};
-                case "chaos_boomerang" -> new String[]{"#ff4d9d", "#8a2be2", "⟲"};
-                case "warden_helmet" -> new String[]{"#83a4d4", "#b6fbff", "◉"};
-                case "twins_sword" -> new String[]{"#ff758c", "#7b2cbf", "⚔"};
-                case "magnet" -> new String[]{"#00d2ff", "#3a7bd5", "✧"};
-                case "time_clock" -> new String[]{"#a18cd1", "#fbc2eb", "⌛"};
-                case "ice_spear", "ice_spear_ice", "ice_spear_spike" -> new String[]{"#83a4d4", "#b6fbff", "❄"};
-                case "default_mask", "mask_block" -> new String[]{"#434343", "#d7d2cc", "☠"};
-                case "happy_mask" -> new String[]{"#fddb92", "#d1fdff", "☻"};
-                case "mask_mace" -> new String[]{"#f7971e", "#ffd200", "✹"};
-                case "mask_tompson" -> new String[]{"#f953c6", "#b91d73", "✦"};
-                case "soul_bow" -> new String[]{"#8e2de2", "#4a00e0", "♜"};
-                default -> new String[]{"#f6d365", "#fda085", "✦"};
-            };
-            meta.displayName(this.mm.deserialize(
-                            "<gradient:" + style[0] + ":" + style[1] + "><bold>" + style[2] + " " + title + "</bold></gradient>")
-                    .decoration(TextDecoration.ITALIC, false));
-        }
-
-        meta.setEnchantmentGlintOverride(Boolean.TRUE);
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        item.setItemMeta(meta);
-        this.stampId(item, id);
-        if (applySwordDamage) {
-            this.applyBaseDamage(item, 4.0D, id);
-        }
-        return item;
-    }
-
-    Material getSpearMaterial() {
-        for (String name : List.of("NETHERITE_SPEAR", "TRIDENT", "NETHERITE_SWORD")) {
-            try {
-                return Material.valueOf(name);
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-        return Material.NETHERITE_SWORD;
-    }
-
     <T extends Entity> T track(T entity) {
         if (entity != null) {
             this.tempEntities.add(entity.getUniqueId());
@@ -995,7 +877,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         if (world != null) {
             ItemDisplay display = this.spawnModel(
                     base.clone().subtract(0.0D, 1.2D * scale, 0.0D),
-                    this.iceSpearSpike(),
+                    this.items.iceSpearSpike(),
                     new Vector3f(0.0F, 0.0F, 0.0F),
                     new Vector3f(scale, scale, scale));
             final UUID id = display.getUniqueId();
@@ -1490,527 +1372,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
                     owner,
                     Component.text("Душа похищена! Душ: " + this.getSouls(bowOwnerId) + "/5", NamedTextColor.DARK_PURPLE));
         }
-    }
-
-    ItemStack cbOrange() {
-        ItemStack item = this.base(
-                Material.COMMAND_BLOCK,
-                CMD_CB_ORANGE,
-                ID_CB_ORANGE,
-                "<gradient:#FF8008:#FFC837><bold>✴ Импульсное Ядро Древних</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Сгусток первозданной энергии, пульсирующий в такт сердцу мира.",
-                "",
-                "#ПРИМЕНЕНИЕ",
-                "Рецепты легендарных артефактов; наковальня:",
-                "10% шанс повысить случайное зачарование на уровень.",
-                "При неудаче теряется 80% оставшейся прочности.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack cbPurple() {
-        ItemStack item = this.base(
-                Material.REPEATING_COMMAND_BLOCK,
-                CMD_CB_PURPLE,
-                ID_CB_PURPLE,
-                "<gradient:#8E2DE2:#4A00E0><bold>۞ Ядро Вечного Цикла</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Бесконечный вихрь хроно-материи, способный искажать реальность.",
-                "",
-                "#ПРИМЕНЕНИЕ",
-                "Рецепты легендарных артефактов; наковальня:",
-                "15% шанс повысить случайное зачарование на уровень.",
-                "При неудаче теряется 80% оставшейся прочности.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack cbGreen() {
-        ItemStack item = this.base(
-                Material.CHAIN_COMMAND_BLOCK,
-                CMD_CB_GREEN,
-                ID_CB_GREEN,
-                "<gradient:#11998e:#38ef7d><bold>❖ Цепное Ядро Сингулярности</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Холодный кристалл абсолютного порядка, связывающий стихии воедино.",
-                "",
-                "#ПРИМЕНЕНИЕ",
-                "Рецепты легендарных артефактов; наковальня:",
-                "17% шанс повысить случайное зачарование на уровень.",
-                "При неудаче теряется 80% оставшейся прочности.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack raBlade() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_RA_BLADE,
-                ID_RA_BLADE,
-                "<gradient:#FFD700:#FF4500><bold>☀ Гелиос, Клинок Бога Ра</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Ослепительный свет древнего божества заточён в этом лезвии.",
-                "",
-                "#АКТИВАЦИЯ",
-                "ПКМ: призвать или отозвать манекен Ра (кд 60с).",
-                "Манекен стоит 45 сек. Удар по нему отражает",
-                "весь урон на всех врагов вокруг в 10 блоках.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack chaosBoomerang() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_CHAOS_BOOMERANG,
-                ID_CHAOS_BOOMERANG,
-                "<gradient:#FF0099:#79095D><bold>🌀 Потрошитель Бездны • Бумеранг Хаоса</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Оружие, не знающее покоя. Несёт в себе частицу чистого безумия.",
-                "",
-                "#ЗАПУСК",
-                "ПКМ: отправить бумеранг в полёт (кд 8с).",
-                "#РИКОШЕТЫ",
-                "Отскакивает от блоков и врагов (макс. 10 раз),",
-                "совершает минимум 3 и максимум 10 отскоков.",
-                "При отскоках сила удара растёт.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack wardenHelmet() {
-        ItemStack item = this.base(
-                Material.CARVED_PUMPKIN,
-                CMD_WARDEN_HELMET,
-                ID_WARDEN_HELMET,
-                "<gradient:#00C9FF:#003366><bold>👁 Корона Глубин • Лик Хранителя</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Эхо глубин лишает владельца зрения, но отмечает окружение светом.",
-                "",
-                "#ПОКА НАДЕТ",
-                "Слепота владельцу; свечение существ",
-                "рядом (до 15 блоков). Вардены не выбирают владельца целью.",
-                "#АКТИВАЦИЯ",
-                "Пустой рукой ПКМ / SHIFT+F: Sonic Boom",
-                "Выстрел летит по направлению взгляда",
-                "до 32 блоков (урон 10, отбрасывание; кд 10с).",
-                "Луч останавливается о стены; наводиться на моба не нужно.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack twinsSword() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_TWINS_SWORD,
-                ID_TWINS_SWORD,
-                "<gradient:#B24592:#F15F79><bold>⚔ Эхо Дуальности • Меч Близнецов</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Клинок, отзывающийся эхом в одном верном союзнике.",
-                "",
-                "#АКТИВАЦИЯ",
-                "ПКМ: призвать близнеца на 30с (кд 30с).",
-                "Близнец следует за вами и повторяет ваши удары;",
-                "активный близнец добавляет 4 урона.",
-                "#ПАССИВНО",
-                "25% шанс нанести дополнительный удар.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack magnet() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_MAGNET,
-                ID_MAGNET,
-                "<gradient:#FF416C:#3A7BD5><bold>🧲 Полюс Гравитации • Магнитник</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Соткан из гравитационных аномалий. Никто не избежит его притяжения.",
-                "",
-                "#АКТИВАЦИЯ",
-                "ПКМ: притянуть врагов к точке взгляда перед вами.",
-                "SHIFT+ПКМ: оттолкнуть врагов и отразить снаряды.",
-                "Перезарядка: 5с.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack timeClock() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_TIME_CLOCK,
-                ID_TIME_CLOCK,
-                "<gradient:#00F2FE:#4FACFE><bold>⏳ Хроносфера • Часы Вечности</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Шестерёнки судьбы тикают внутри, позволяя повелевать самим временем.",
-                "",
-                "#ЗАПИСЬ",
-                "ЛКМ по сущности: записать 10 секунд её движений,",
-                "затем остановка до 3 минут. Цель неуязвима.",
-                "#УПРАВЛЕНИЕ",
-                "Колёсико мыши: листать записанные кадры",
-                "(SHIFT: сразу по 10 кадров).",
-                "ПКМ: вернуть время с выбранного кадра (кд 3 мин).");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack iceSpear() {
-        ItemStack item = this.base(
-                this.getSpearMaterial(),
-                CMD_ICE_SPEAR,
-                ID_ICE_SPEAR,
-                "<gradient:#83a4d4:#b6fbff><bold>❄ Гласиус • Копьё Вечной Мерзлоты</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Сковано в сердце вечной мерзлоты. Его прикосновение останавливает жизнь.",
-                "",
-                "#АКТИВАЦИЯ",
-                "1-й слот + SHIFT+ПКМ: вызвать морозные пики (кд 75с).",
-                "#ПАССИВНО",
-                "2-й слот: удар замораживает цель на 3с",
-                "(перезарядка эффекта 6с).");
-        if (meta != null) {
-            Enchantment lunge = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("lunge"));
-            if (lunge != null) {
-                meta.addEnchant(lunge, 4, true);
-            } else {
-                meta.addEnchant(Enchantment.RIPTIDE, 4, true);
-            }
-        }
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack iceSpearIce() {
-        ItemStack item = this.base(Material.NETHERITE_SWORD, CMD_ICE_SPEAR_ICE, ID_ICE_SPEAR_ICE, "<aqua>Лёд копья</aqua>", true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(meta, "~След вечной мерзлоты, оставленный Морозным копьём.", "", "#АРТЕФАКТ", "Ледяной образ из набора Морозного копья.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack iceSpearSpike() {
-        ItemStack item = this.base(Material.NETHERITE_SWORD, CMD_ICE_SPEAR_SPIKE, ID_ICE_SPEAR_SPIKE, "<aqua>Морозные пики</aqua>", true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(meta, "~Осколки льда, пробуждённые силой Морозного копья.", "", "#АРТЕФАКТ", "Ледяной образ из набора Морозного копья.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack defaultMask() {
-        ItemStack item = this.base(
-                Material.CARVED_PUMPKIN,
-                CMD_DEFAULT_MASK,
-                ID_DEFAULT_MASK,
-                "<gradient:#56ab2f:#a8e063><bold>🎭 Лик Безумия • Маска Хаоса</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Безликая маска, скрывающая истинные намерения и дарующая безумную силу.",
-                "",
-                "#КОГДА НАДЕТА",
-                "Бег и парение при падении.",
-                "В приседе + F или SHIFT+ПКМ: Молот — сокрушающий",
-                "удар радиусом 5 блоков, 10 сердец игрокам (кд 5 мин).",
-                "Бег: 5 сек в приседе дают ускорение +20% на 10 сек.",
-                "Падение: на высоте более 20 блоков паришь",
-                "в воздухе, пока не посмотришь вниз.",
-                "",
-                "#В РУКЕ",
-                "ПКМ: Томпсоны — парный взрывной выстрел");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack happyMask() {
-        ItemStack item = this.base(
-                Material.CARVED_PUMPKIN,
-                CMD_HAPPY_MASK,
-                ID_HAPPY_MASK,
-                "<gradient:#FFE000:#799F0C><bold>☺ Эйфория • Счастливая Маска</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Её улыбка неестественна, но она дарует невиданную жизненную силу.",
-                "",
-                "#ПОКА НАДЕТА",
-                "Регенерация и ночное зрение.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack maskBlock() {
-        ItemStack item = this.base(Material.CARVED_PUMPKIN, CMD_MASK_BLOCK, ID_MASK_BLOCK, "<gold>Блок маски</gold>", false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(meta, "~Фрагмент легенды о Маске.", "", "#АРТЕФАКТ", "Самостоятельной способности нет.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack maskMace() {
-        ItemStack item = this.base(
-                Material.MACE,
-                CMD_MASK_MACE,
-                ID_MASK_MACE,
-                "<gradient:#FF512F:#DD2476><bold>🔨 Крушитель Черепов • Молот Маски</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Игрушечный на вид, но сокрушительно смертоносный на деле.",
-                "",
-                "#АРТЕФАКТ",
-                "Булава, используемая как образ молота",
-                "во время способности Маски. Отдельной способности нет.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack maskThompson() {
-        ItemStack item = this.base(
-                Material.NETHERITE_SWORD,
-                CMD_MASK_TOMPSON,
-                ID_MASK_TOMPSON,
-                "<gradient:#D31027:#EA384D><bold>🔫 Гнев Чикаго • Парные Томпсоны</bold></gradient>",
-                true);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Свинцовый дождь с привкусом пороха и хаоса.",
-                "",
-                "#АКТИВАЦИЯ",
-                "ПКМ: выстрелить взрывной пулей.",
-                "Урон взрыва: 5 в радиусе 2 блоков.",
-                "#ИЗНОС",
-                "Каждый выстрел расходует 10 прочности.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    ItemStack soulBow() {
-        ItemStack item = this.base(
-                Material.BOW,
-                CMD_SOUL_BOW,
-                ID_SOUL_BOW,
-                "<gradient:#43cea2:#185a9d><bold>👻 Шёпот Павших • Лук Душ</bold></gradient>",
-                false);
-        ItemMeta meta = item.getItemMeta();
-        this.setLore(
-                meta,
-                "~Тетива сплетена из стонов павших.",
-                "",
-                "#ПОХИЩЕНИЕ ДУШ",
-                "Убийство игрока луком забирает его душу:",
-                "жертва теряет тело и ничего не может делать.",
-                "#СИЛА ВЫСТРЕЛА",
-                "Урон = 5 + число душ (максимум 5 душ).",
-                "Выстрел на 5-й душе тратит 1 душу.",
-                "#ДУШИ",
-                "SHIFT+ЛКМ: поглотить душу (+4 сердца).",
-                "/revive НИК: возродить бездушного за 5 сердец.",
-                "Смерть владельца возвращает всех в норму.");
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    void logRecipes() {
-        int count = 0;
-        for (String key : RECIPE_KEYS) {
-            if (this.getServer().getRecipe(new NamespacedKey(this, key)) != null) {
-                count++;
-            } else {
-                this.getLogger().warning("Рецепт НЕ зарегистрирован: " + key);
-            }
-        }
-        this.getLogger().info("Рецептов зарегистрировано: " + count + "/" + RECIPE_KEYS.size());
-    }
-
-    void registerRecipes() {
-        NamespacedKey kOrange = new NamespacedKey(this, "cb_orange");
-        this.getServer().removeRecipe(kOrange);
-        ShapedRecipe rOrange = new ShapedRecipe(kOrange, this.cbOrange());
-        rOrange.shape("CDC", "NPN", "TET");
-        rOrange.setIngredient('C', Material.COPPER_BLOCK);
-        rOrange.setIngredient('D', Material.ANCIENT_DEBRIS);
-        rOrange.setIngredient('N', Material.NETHERITE_INGOT);
-        rOrange.setIngredient('P', Material.PIGLIN_HEAD);
-        rOrange.setIngredient('T', Material.TOTEM_OF_UNDYING);
-        rOrange.setIngredient('E', Material.ENDER_EYE);
-        this.getServer().addRecipe(rOrange);
-
-        RecipeChoice.ExactChoice cOrange = new RecipeChoice.ExactChoice(this.cbOrange());
-        RecipeChoice.ExactChoice cPurple = new RecipeChoice.ExactChoice(this.cbPurple());
-        RecipeChoice.ExactChoice cGreen = new RecipeChoice.ExactChoice(this.cbGreen());
-
-        NamespacedKey kPurple = new NamespacedKey(this, "cb_purple");
-        this.getServer().removeRecipe(kPurple);
-        ShapedRecipe rPurple = new ShapedRecipe(kPurple, this.cbPurple());
-        rPurple.shape(" SI", "SCS", "IS ");
-        rPurple.setIngredient('S', Material.NETHERITE_SCRAP);
-        rPurple.setIngredient('I', Material.NETHERITE_INGOT);
-        rPurple.setIngredient('C', cOrange);
-        this.getServer().addRecipe(rPurple);
-
-        NamespacedKey kGreen = new NamespacedKey(this, "cb_green");
-        this.getServer().removeRecipe(kGreen);
-        ShapedRecipe rGreen = new ShapedRecipe(kGreen, this.cbGreen());
-        rGreen.shape("BAB", "ANA", "BAB");
-        rGreen.setIngredient('B', Material.BLUE_ICE);
-        rGreen.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
-        rGreen.setIngredient('N', Material.NETHERITE_INGOT);
-        this.getServer().addRecipe(rGreen);
-
-        NamespacedKey kClock = new NamespacedKey(this, "time_clock");
-        this.getServer().removeRecipe(kClock);
-        ShapedRecipe rClock = new ShapedRecipe(kClock, this.timeClock());
-        rClock.shape("SNS", "PCP", "GBG");
-        rClock.setIngredient('S', Material.NETHER_STAR);
-        rClock.setIngredient('N', Material.NETHERITE_BLOCK);
-        rClock.setIngredient('P', cPurple);
-        rClock.setIngredient('C', Material.CLOCK);
-        rClock.setIngredient('G', Material.GOLD_BLOCK);
-        rClock.setIngredient('B', cOrange);
-        this.getServer().addRecipe(rClock);
-
-        NamespacedKey kSpear = new NamespacedKey(this, "ice_spear");
-        this.getServer().removeRecipe(kSpear);
-        ShapedRecipe rSpear = new ShapedRecipe(kSpear, this.iceSpear());
-        rSpear.shape("IBI", "GSG", "INI");
-        rSpear.setIngredient('I', Material.BLUE_ICE);
-        rSpear.setIngredient('B', cOrange);
-        rSpear.setIngredient('G', cGreen);
-        rSpear.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SPEAR));
-        rSpear.setIngredient('N', Material.NETHERITE_INGOT);
-        this.getServer().addRecipe(rSpear);
-
-        NamespacedKey kMask = new NamespacedKey(this, "default_mask");
-        this.getServer().removeRecipe(kMask);
-        ShapedRecipe rMask = new ShapedRecipe(kMask, this.defaultMask());
-        rMask.shape("CHC", "NSN", "CEC");
-        rMask.setIngredient('C', cOrange);
-        rMask.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
-        rMask.setIngredient('N', Material.NETHERITE_BLOCK);
-        rMask.setIngredient('S', Material.NETHER_STAR);
-        rMask.setIngredient('E', Material.EMERALD_BLOCK);
-        this.getServer().addRecipe(rMask);
-
-        NamespacedKey kWarden = new NamespacedKey(this, "warden_helmet");
-        this.getServer().removeRecipe(kWarden);
-        ShapedRecipe rWarden = new ShapedRecipe(kWarden, this.wardenHelmet());
-        rWarden.shape("HSH", "SCS", "N N");
-        rWarden.setIngredient('H', new RecipeChoice.MaterialChoice(Material.NETHERITE_HELMET));
-        rWarden.setIngredient('S', Material.WITHER_SKELETON_SKULL);
-        rWarden.setIngredient('C', Material.SCULK_CATALYST);
-        rWarden.setIngredient('N', Material.NETHERITE_INGOT);
-        this.getServer().addRecipe(rWarden);
-
-        NamespacedKey kRa = new NamespacedKey(this, "ra_blade");
-        this.getServer().removeRecipe(kRa);
-        ShapedRecipe rRa = new ShapedRecipe(kRa, this.raBlade());
-        rRa.shape("ASA", "TMT", "RBR");
-        rRa.setIngredient('A', Material.ENCHANTED_GOLDEN_APPLE);
-        rRa.setIngredient('R', Material.NETHER_STAR);
-        rRa.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
-        rRa.setIngredient('T', Material.TOTEM_OF_UNDYING);
-        rRa.setIngredient('M', Material.MACE);
-        rRa.setIngredient('B', Material.BLAZE_ROD);
-        this.getServer().addRecipe(rRa);
-
-        NamespacedKey kBoomerang = new NamespacedKey(this, "chaos_boomerang");
-        this.getServer().removeRecipe(kBoomerang);
-        ShapedRecipe rBoomerang = new ShapedRecipe(kBoomerang, this.chaosBoomerang());
-        rBoomerang.shape("DSD", "HTH", "NBN");
-        rBoomerang.setIngredient('H', Material.HEAVY_CORE);
-        rBoomerang.setIngredient('D', new RecipeChoice.MaterialChoice(Material.DIAMOND_SWORD));
-        rBoomerang.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
-        rBoomerang.setIngredient('T', new RecipeChoice.MaterialChoice(Material.TRIDENT, Material.NETHERITE_SWORD));
-        rBoomerang.setIngredient('N', Material.NETHERITE_INGOT);
-        rBoomerang.setIngredient('B', Material.SHIELD);
-        this.getServer().addRecipe(rBoomerang);
-
-        NamespacedKey kTwins = new NamespacedKey(this, "twins_sword");
-        this.getServer().removeRecipe(kTwins);
-        ShapedRecipe rTwins = new ShapedRecipe(kTwins, this.twinsSword());
-        rTwins.shape("S S", "WNW", "RBR");
-        rTwins.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
-        rTwins.setIngredient('W', Material.WITHER_SKELETON_SKULL);
-        rTwins.setIngredient('N', Material.MUSIC_DISC_5);
-        rTwins.setIngredient('R', Material.NETHER_STAR);
-        rTwins.setIngredient('B', Material.END_ROD);
-        this.getServer().addRecipe(rTwins);
-
-        NamespacedKey kMagnet = new NamespacedKey(this, "magnet");
-        this.getServer().removeRecipe(kMagnet);
-        ShapedRecipe rMagnet = new ShapedRecipe(kMagnet, this.magnet());
-        rMagnet.shape("RWB", "RMB", "NIN");
-        rMagnet.setIngredient('R', Material.REDSTONE_BLOCK);
-        rMagnet.setIngredient('B', Material.LAPIS_BLOCK);
-        rMagnet.setIngredient('W', Material.WITHER_SKELETON_SKULL);
-        rMagnet.setIngredient('M', Material.MACE);
-        rMagnet.setIngredient('I', Material.IRON_BLOCK);
-        rMagnet.setIngredient('N', Material.NETHERITE_INGOT);
-        this.getServer().addRecipe(rMagnet);
-
-        // The Happy Mask is only the worn form of the Chaos Mask, not a separate craft.
-        // Remove the old recipe so it disappears after a reload too.
-        this.getServer().removeRecipe(new NamespacedKey(this, "happy_mask"));
-
-        NamespacedKey kDeath = new NamespacedKey(this, "death_note");
-        this.getServer().removeRecipe(kDeath);
-        ShapedRecipe rDeath = new ShapedRecipe(kDeath, DeathNoteListener.create(this));
-        rDeath.shape("SWS", "NPN", "COC");
-        rDeath.setIngredient('S', Material.WITHER_SKELETON_SKULL);
-        rDeath.setIngredient('W', Material.WRITABLE_BOOK);
-        rDeath.setIngredient('N', Material.NETHERITE_INGOT);
-        rDeath.setIngredient('P', cPurple);
-        rDeath.setIngredient('C', Material.CRYING_OBSIDIAN);
-        rDeath.setIngredient('O', cOrange);
-        this.getServer().addRecipe(rDeath);
-
-        NamespacedKey kScales = new NamespacedKey(this, "fate_scales");
-        this.getServer().removeRecipe(kScales);
-        ShapedRecipe rScales = new ShapedRecipe(kScales, ScalesOfFateListener.createScales(this));
-        rScales.shape("GNG", "PSA", "GTG");
-        rScales.setIngredient('G', Material.GOLD_BLOCK);
-        rScales.setIngredient('N', Material.NETHER_STAR);
-        rScales.setIngredient('P', cPurple);
-        rScales.setIngredient('S', new RecipeChoice.MaterialChoice(Material.NETHERITE_SWORD));
-        rScales.setIngredient('A', cOrange);
-        rScales.setIngredient('T', Material.TOTEM_OF_UNDYING);
-        this.getServer().addRecipe(rScales);
     }
 
     static record ThrownBoomerang(UUID owner, ItemStack item, String throwSessionId) {

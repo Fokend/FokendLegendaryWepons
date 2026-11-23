@@ -125,7 +125,7 @@ final class TwinsSwordListener implements Listener {
                     m.getEquipment().setChestplate(this.plugin.visualCopy(p.getInventory().getChestplate()));
                     m.getEquipment().setLeggings(this.plugin.visualCopy(p.getInventory().getLeggings()));
                     m.getEquipment().setBoots(this.plugin.visualCopy(p.getInventory().getBoots()));
-                    m.getEquipment().setItemInMainHand(this.plugin.visualCopy(this.plugin.twinsSword()));
+                    m.getEquipment().setItemInMainHand(this.plugin.visualCopy(this.plugin.items.twinsSword()));
                 }
                 m.customName(Component.text(
                         "✦ " + p.getName() + " " + (side == -1 ? "I" : "II"),

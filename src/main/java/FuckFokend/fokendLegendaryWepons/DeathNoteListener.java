@@ -96,10 +96,10 @@ final class DeathNoteListener implements Listener {
     }
 
     static ItemStack create(FokendLegendaryWepons plugin) {
-        ItemStack item = plugin.base(Material.WRITABLE_BOOK, 20011, "death_note",
+        ItemStack item = plugin.items.base(Material.WRITABLE_BOOK, 20011, "death_note",
                 "<gradient:#434343:#c0392b><bold>☠ Тетрадь Смерти</bold></gradient>", false);
         ItemMeta m = item.getItemMeta();
-        plugin.setLore(m,
+        plugin.items.setLore(m,
                 "~Существо, чьё имя записано в эту тетрадь, умрёт.",
                 "",
                 "#ЗАПИСЬ",

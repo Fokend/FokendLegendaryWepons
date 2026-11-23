@@ -173,24 +173,24 @@ final class LegendaryCommand implements CommandExecutor, TabCompleter {
         }
 
         ItemStack item = switch (sub) {
-            case "cb_orange" -> this.plugin.cbOrange();
-            case "cb_purple" -> this.plugin.cbPurple();
-            case "cb_green" -> this.plugin.cbGreen();
-            case "ra_blade", "ra", "ra_god_blade" -> this.plugin.raBlade();
-            case "chaos_boomerang", "chaos", "boomerang" -> this.plugin.chaosBoomerang();
-            case "warden_helmet", "warden" -> this.plugin.wardenHelmet();
-            case "twins_sword", "twins" -> this.plugin.twinsSword();
-            case "magnet" -> this.plugin.magnet();
-            case "time_clock", "clock" -> this.plugin.timeClock();
-            case "ice_spear", "spear" -> this.plugin.iceSpear();
-            case "ice_spear_ice" -> this.plugin.iceSpearIce();
-            case "ice_spear_spike" -> this.plugin.iceSpearSpike();
-            case "default_mask", "mask" -> this.plugin.defaultMask();
-            case "happy_mask" -> this.plugin.happyMask();
-            case "mask_block" -> this.plugin.maskBlock();
-            case "mask_mace" -> this.plugin.maskMace();
-            case "mask_tompson", "thompson" -> this.plugin.maskThompson();
-            case "soul_bow", "bow" -> this.plugin.soulBow();
+            case "cb_orange" -> this.plugin.items.cbOrange();
+            case "cb_purple" -> this.plugin.items.cbPurple();
+            case "cb_green" -> this.plugin.items.cbGreen();
+            case "ra_blade", "ra", "ra_god_blade" -> this.plugin.items.raBlade();
+            case "chaos_boomerang", "chaos", "boomerang" -> this.plugin.items.chaosBoomerang();
+            case "warden_helmet", "warden" -> this.plugin.items.wardenHelmet();
+            case "twins_sword", "twins" -> this.plugin.items.twinsSword();
+            case "magnet" -> this.plugin.items.magnet();
+            case "time_clock", "clock" -> this.plugin.items.timeClock();
+            case "ice_spear", "spear" -> this.plugin.items.iceSpear();
+            case "ice_spear_ice" -> this.plugin.items.iceSpearIce();
+            case "ice_spear_spike" -> this.plugin.items.iceSpearSpike();
+            case "default_mask", "mask" -> this.plugin.items.defaultMask();
+            case "happy_mask" -> this.plugin.items.happyMask();
+            case "mask_block" -> this.plugin.items.maskBlock();
+            case "mask_mace" -> this.plugin.items.maskMace();
+            case "mask_tompson", "thompson" -> this.plugin.items.maskThompson();
+            case "soul_bow", "bow" -> this.plugin.items.soulBow();
             case "death_note", "deathnote" -> DeathNoteListener.create(this.plugin);
             case "fate_scales", "scales_of_fate", "scales" -> ScalesOfFateListener.createScales(this.plugin);
             case "fate_lightning", "lightning" -> ScalesOfFateListener.createLightning(this.plugin);
