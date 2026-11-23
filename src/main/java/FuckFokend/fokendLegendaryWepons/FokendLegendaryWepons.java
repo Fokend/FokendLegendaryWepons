@@ -236,8 +236,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
             legendaryCmd.setExecutor(legendaryExec);
             legendaryCmd.setTabCompleter(legendaryExec);
         }
-        this.disableConflictingLegacyPlugins(legendaryExec);
-        this.getServer().getScheduler().runTask(this, () -> this.disableConflictingLegacyPlugins(legendaryExec));
+        this.warnAboutLegacyPlugin();
 
         final ReviveCommand reviveExec = new ReviveCommand();
         PluginCommand reviveCmd = this.getCommand("revive");
@@ -404,32 +403,14 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.cooldowns.startTasks();
     }
 
-    private void disableConflictingLegacyPlugins(LegendaryCommand legendaryExec) {
-        PluginManager pm = this.getServer().getPluginManager();
-        for (org.bukkit.plugin.Plugin other : pm.getPlugins()) {
-            if (other != null && other != this) {
-                String name = other.getName();
-                String mainClass = other.getClass().getName();
-                if ("LegendaryWeapons".equalsIgnoreCase(name)
-                        || mainClass.startsWith("ru.legendary.weapons.")) {
-                    this.getLogger().warning("Обнаружен старый конфликтующий плагин " + name + " — отключаем его.");
-                    org.bukkit.event.HandlerList.unregisterAll(other);
-                    this.getServer().getScheduler().cancelTasks(other);
-                    if (other.isEnabled()) {
-                        pm.disablePlugin(other);
-                    }
-                }
+    /** The old LegendaryWeapons plugin registers the same /legendary command; tell the admin to remove it. */
+    private void warnAboutLegacyPlugin() {
+        for (org.bukkit.plugin.Plugin other : this.getServer().getPluginManager().getPlugins()) {
+            if (other != this && ("LegendaryWeapons".equalsIgnoreCase(other.getName())
+                    || other.getClass().getName().startsWith("ru.legendary.weapons."))) {
+                this.getLogger().warning("Old plugin " + other.getName() + " is installed and conflicts with this one"
+                        + " (both register /legendary). Remove it from the plugins folder.");
             }
-        }
-        PluginCommand legendaryCmd = this.getCommand("legendary");
-        if (legendaryCmd != null) {
-            legendaryCmd.setExecutor(legendaryExec);
-            legendaryCmd.setTabCompleter(legendaryExec);
-        }
-        Command mapCmd = this.getServer().getCommandMap().getCommand("legendary");
-        if (mapCmd instanceof PluginCommand pc && pc.getPlugin() != this) {
-            pc.setExecutor(legendaryExec);
-            pc.setTabCompleter(legendaryExec);
         }
     }
 
