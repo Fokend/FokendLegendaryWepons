@@ -76,14 +76,14 @@ final class TwinsSwordListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "twins_sword")) return;
 
         e.setCancelled(true);
-        if (this.plugin.onCooldown(p, "twins_summon", 30000L)) {
-            long sec = this.plugin.cooldownRemaining(p, "twins_summon", 30000L) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(
+        if (this.plugin.cooldowns.isOnCooldown(p, "twins_summon", 30000L)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "twins_summon", 30000L);
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Близнецы на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.setCooldown(p, "twins_summon", 30000L, "Призыв близнецов");
+        this.plugin.cooldowns.start(p, "twins_summon", 30000L, "Призыв близнецов");
         List<UUID> oldTwins = this.plugin.activeTwins.remove(p.getUniqueId());
         if (oldTwins != null) {
             for (UUID oldId : oldTwins) {
@@ -139,7 +139,7 @@ final class TwinsSwordListener implements Listener {
 
         this.plugin.activeTwins.put(ownerId, twinIds);
         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.2F, 1.0F);
-        this.plugin.sendPriorityActionBar(p, Component.text("Близнецы призваны на 30 секунд!", NamedTextColor.LIGHT_PURPLE));
+        this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Близнецы призваны на 30 секунд!", NamedTextColor.LIGHT_PURPLE));
 
         final float startYaw = p.getLocation().getYaw();
         final Location startLoc = p.getLocation().clone();

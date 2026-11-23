@@ -33,8 +33,8 @@ final class MaskThompsonListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "mask_tompson")) return;
 
         e.setCancelled(true);
-        if (this.plugin.onCooldown(p, "mask_tompson_shot", 250L)) return;
-        this.plugin.cooldowns.put(p.getUniqueId() + ":mask_tompson_shot", System.currentTimeMillis());
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot", 250L)) return;
+        this.plugin.cooldowns.startSilent(p, "mask_tompson_shot");
 
         if (p.getGameMode() != GameMode.CREATIVE) {
             ItemMeta meta = held.getItemMeta();

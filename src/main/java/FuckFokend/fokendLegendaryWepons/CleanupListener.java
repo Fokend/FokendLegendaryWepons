@@ -48,11 +48,7 @@ final class CleanupListener implements Listener {
         // Return any active Chaos Boomerangs directly to the quitting player's inventory
         plugin.returnAllBoomerangsFor(p);
 
-        String cooldownPrefix = id + ":";
-        plugin.cooldowns.keySet().removeIf(key -> key.startsWith(cooldownPrefix));
-        plugin.cooldownHud.keySet().removeIf(key -> key.startsWith(cooldownPrefix));
-        plugin.actionBarPriorityUntil.remove(id);
-        plugin.selectedHudCooldown.remove(id);
+        plugin.cooldowns.clear(id);
 
         UUID dollId = plugin.raDolls.remove(id);
         if (dollId != null) {

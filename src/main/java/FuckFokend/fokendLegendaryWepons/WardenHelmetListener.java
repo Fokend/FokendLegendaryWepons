@@ -409,13 +409,13 @@ final class WardenHelmetListener implements Listener {
 
     private void activateSonicBoom(Player p) {
         if (this.plugin.isLocked(p)) return;
-        if (this.plugin.onCooldown(p, "warden_boom", CD)) {
-            long sec = this.plugin.cooldownRemaining(p, "warden_boom", CD) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(p, Component.text("Sonic Boom на перезарядке: " + sec + "с", NamedTextColor.RED));
+        if (this.plugin.cooldowns.isOnCooldown(p, "warden_boom", CD)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "warden_boom", CD);
+            this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Sonic Boom на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.setCooldown(p, "warden_boom", CD, "Sonic Boom");
+        this.plugin.cooldowns.start(p, "warden_boom", CD, "Sonic Boom");
         Location eye = p.getEyeLocation();
         World world = p.getWorld();
         Vector dir = eye.getDirection().normalize();

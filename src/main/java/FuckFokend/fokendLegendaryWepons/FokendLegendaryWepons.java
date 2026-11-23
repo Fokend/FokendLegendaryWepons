@@ -132,7 +132,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
     static final int MAX_SOULS = 5;
     static final double REVIVE_HP = 5.0D;
     static final boolean HAMMER_HITS_MOBS = false;
-    static final int COOLDOWN_BAR_LENGTH = 10;
 
     public static NamespacedKey KEY;
     private static FokendLegendaryWepons instance;
@@ -141,10 +140,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final MiniMessage mm = MiniMessage.miniMessage();
     final Map<UUID, UUID> raDolls = new ConcurrentHashMap<>();
     final Map<UUID, List<UUID>> activeTwins = new ConcurrentHashMap<>();
-    final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
-    final Map<String, HudCooldown> cooldownHud = new ConcurrentHashMap<>();
-    final Map<UUID, Long> actionBarPriorityUntil = new ConcurrentHashMap<>();
-    final Map<UUID, String> selectedHudCooldown = new ConcurrentHashMap<>();
+    final CooldownManager cooldowns = new CooldownManager(this);
     final Map<UUID, Long> maskSneakStart = new ConcurrentHashMap<>();
     final Map<UUID, Long> maskRunUntil = new ConcurrentHashMap<>();
     final Set<UUID> hovering = ConcurrentHashMap.newKeySet();
@@ -312,13 +308,13 @@ public class FokendLegendaryWepons extends JavaPlugin {
                             long elapsed = now - start;
                             if (elapsed >= MASK_RUN_DELAY) {
                                 if (!active) {
-                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                    FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                             p, Component.text("Бег активирован: +20% скорости!", NamedTextColor.GREEN));
                                     p.playSound(p.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 1.0F, 1.4F);
                                 }
                                 FokendLegendaryWepons.this.maskRunUntil.put(id, now + MASK_RUN_LINGER);
                             } else if (!active) {
-                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                         p,
                                         Component.text(
                                                 String.format(Locale.US, "Заряд бега: %.1f / %d с", elapsed / 1000.0D, 5L),
@@ -365,7 +361,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                                 FokendLegendaryWepons.this.releaseHover(p);
                                 FokendLegendaryWepons.this.fallingFree.add(id);
                                 p.setFallDistance(0.0F);
-                                FokendLegendaryWepons.this.sendPriorityActionBar(
+                                FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                         p, Component.text("Падение", NamedTextColor.GRAY));
                             } else {
                                 p.setFallDistance(0.0F);
@@ -378,7 +374,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                                         p.getLocation().add(0.0D, 0.1D, 0.0D),
                                         2, 0.25D, 0.02D, 0.25D, 0.01D);
                                 if (p.getTicksLived() % 10 == 0) {
-                                    FokendLegendaryWepons.this.sendPriorityActionBar(
+                                    FokendLegendaryWepons.this.cooldowns.sendPriorityActionBar(
                                             p,
                                             Component.text("Парение: посмотри вниз, чтобы упасть", NamedTextColor.AQUA));
                                 }
@@ -404,74 +400,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
             }
         }.runTaskTimer(this, 0L, 1L);
 
-        // Periodic cleanup of expired cooldown entries
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                FokendLegendaryWepons.this.cooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 600000L);
-            }
-        }.runTaskTimer(this, 6000L, 6000L);
-
-        // ActionBar Cooldown HUD
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                this.runSyncHud();
-            }
-
-            private void runSyncHud() {
-                long now = System.currentTimeMillis();
-                FokendLegendaryWepons.this.cooldownHud.entrySet().removeIf(entry -> {
-                    Long started = FokendLegendaryWepons.this.cooldowns.get(entry.getKey());
-                    if (started == null) {
-                        return true;
-                    } else if (now - started < entry.getValue().durationMs()) {
-                        return false;
-                    } else {
-                        int sep = entry.getKey().indexOf(':');
-                        if (sep > 0) {
-                            try {
-                                Player p = FokendLegendaryWepons.this.getServer().getPlayer(
-                                        UUID.fromString(entry.getKey().substring(0, sep)));
-                                if (p != null && p.isOnline()) {
-                                    p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.25F, 1.65F);
-                                }
-                            } catch (IllegalArgumentException ignored) {
-                            }
-                        }
-                        return true;
-                    }
-                });
-
-                for (Player p : FokendLegendaryWepons.this.getServer().getOnlinePlayers()) {
-                    UUID id = p.getUniqueId();
-                    if (FokendLegendaryWepons.this.actionBarPriorityUntil.getOrDefault(id, 0L) <= now) {
-                        String prefix = id + ":";
-                        String selected = FokendLegendaryWepons.this.selectedHudCooldown.get(id);
-                        if (selected != null && FokendLegendaryWepons.this.isHudCooldownActive(prefix + selected, now)) {
-                            FokendLegendaryWepons.this.sendCooldownHud(p, selected, now);
-                        } else {
-                            FokendLegendaryWepons.this.selectedHudCooldown.remove(id);
-                            String next = FokendLegendaryWepons.this.cooldownHud.keySet().stream()
-                                    .filter(k -> k.startsWith(prefix) && FokendLegendaryWepons.this.isHudCooldownActive(k, now))
-                                    .max((a, b) -> {
-                                        int cmp = Long.compare(
-                                                FokendLegendaryWepons.this.cooldowns.getOrDefault(a, 0L),
-                                                FokendLegendaryWepons.this.cooldowns.getOrDefault(b, 0L));
-                                        return cmp != 0 ? cmp : a.compareTo(b);
-                                    })
-                                    .map(k -> k.substring(prefix.length()))
-                                    .orElse(null);
-                            if (next != null) {
-                                FokendLegendaryWepons.this.selectedHudCooldown.put(id, next);
-                                FokendLegendaryWepons.this.sendCooldownHud(p, next, now);
-                            }
-                        }
-                    }
-                }
-            }
-        }.runTaskTimer(this, 0L, 3L);
+        this.cooldowns.startTasks();
     }
 
     private void disableConflictingLegacyPlugins(LegendaryCommand legendaryExec) {
@@ -521,9 +450,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
     public void onDisable() {
         this.restoreAllEntities();
         this.getServer().getScheduler().cancelTasks(this);
-        this.cooldownHud.clear();
-        this.actionBarPriorityUntil.clear();
-        this.selectedHudCooldown.clear();
+        this.cooldowns.shutdown();
 
         for (UUID dollId : this.raDolls.values()) {
             Entity entity = this.getServer().getEntity(dollId);
@@ -657,53 +584,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
             }
         }
         return false;
-    }
-
-    boolean onCooldown(Player p, String key, long durationMs) {
-        return this.cooldownRemaining(p, key, durationMs) > 0L;
-    }
-
-    long cooldownRemaining(Player p, String key, long durationMs) {
-        Long started = this.cooldowns.get(p.getUniqueId() + ":" + key);
-        return started == null ? 0L : Math.max(0L, started + durationMs - System.currentTimeMillis());
-    }
-
-    void setCooldown(Player p, String key, long durationMs, String displayName) {
-        String mapKey = p.getUniqueId() + ":" + key;
-        this.cooldowns.put(mapKey, System.currentTimeMillis());
-        this.cooldownHud.put(mapKey, new HudCooldown(durationMs, displayName));
-        this.selectedHudCooldown.put(p.getUniqueId(), key);
-    }
-
-    boolean isHudCooldownActive(String fullKey, long now) {
-        HudCooldown hud = this.cooldownHud.get(fullKey);
-        Long started = this.cooldowns.get(fullKey);
-        return hud != null && started != null && now - started < hud.durationMs();
-    }
-
-    void sendCooldownHud(Player p, String key, long now) {
-        String fullKey = p.getUniqueId() + ":" + key;
-        HudCooldown hud = this.cooldownHud.get(fullKey);
-        Long started = this.cooldowns.get(fullKey);
-        if (hud != null && started != null) {
-            long rem = Math.max(0L, hud.durationMs() - (now - started));
-            if (rem != 0L && hud.durationMs() > 0L) {
-                double ratio = Math.max(0.0D, Math.min(1.0D, (double) rem / (double) hud.durationMs()));
-                int filled = (int) Math.round(ratio * COOLDOWN_BAR_LENGTH);
-                String bar = "▰".repeat(filled) + "▱".repeat(COOLDOWN_BAR_LENGTH - filled);
-                Component msg = ((TextComponent) Component.text(
-                                "⚔ " + hud.name() + "  " + String.format(Locale.US, "%.1fs ", rem / 1000.0D),
-                                NamedTextColor.GRAY)
-                        .append(Component.text(bar.substring(0, filled), NamedTextColor.AQUA)))
-                        .append(Component.text(bar.substring(filled), NamedTextColor.DARK_GRAY));
-                p.sendActionBar(msg);
-            }
-        }
-    }
-
-    void sendPriorityActionBar(Player p, Component msg) {
-        this.actionBarPriorityUntil.put(p.getUniqueId(), System.currentTimeMillis() + 2000L);
-        p.sendActionBar(msg);
     }
 
     boolean isCraftingCore(String id) {
@@ -1313,8 +1193,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
         final TimeSession session = new TimeSession(ownerId, targetId);
         this.timeSessions.put(session.owner, session);
         this.timeByTarget.put(session.target, session);
-        this.setCooldown(owner, "time_clock", 180000L, "Часы времени");
-        this.sendPriorityActionBar(owner, Component.text("Часы записывают движения цели: 10 секунд...", NamedTextColor.AQUA));
+        this.cooldowns.start(owner, "time_clock", 180000L, "Часы времени");
+        this.cooldowns.sendPriorityActionBar(owner, Component.text("Часы записывают движения цели: 10 секунд...", NamedTextColor.AQUA));
         owner.getWorld().playSound(owner.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.0F, 1.8F);
 
         session.recordTask = new BukkitRunnable() {
@@ -1345,7 +1225,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                     Particle.END_ROD, target.getLocation().add(0.0D, 1.0D, 0.0D), 40, 0.4D, 0.8D, 0.4D, 0.05D);
             target.getWorld().playSound(target.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 1.0F, 0.5F);
             if (owner != null && owner.isOnline()) {
-                this.sendPriorityActionBar(
+                this.cooldowns.sendPriorityActionBar(
                         owner,
                         Component.text("Время остановлено! Колёсико: листать кадры, ПКМ: вернуть время.", NamedTextColor.AQUA));
             }
@@ -1397,7 +1277,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         session.frozen = false;
         Player owner = this.getServer().getPlayer(session.owner);
         if (owner != null && message != null) {
-            this.sendPriorityActionBar(owner, Component.text(message, NamedTextColor.YELLOW));
+            this.cooldowns.sendPriorityActionBar(owner, Component.text(message, NamedTextColor.YELLOW));
         }
     }
 
@@ -1409,7 +1289,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
                 TimeFrame frame = session.frames.get(session.index);
                 this.applyTimeFrame(target, frame);
                 double secondsBack = (session.frames.size() - 1 - session.index) / 20.0D;
-                this.sendPriorityActionBar(
+                this.cooldowns.sendPriorityActionBar(
                         owner,
                         Component.text(
                                 String.format(
@@ -1634,7 +1514,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.saveSouls();
         Player owner = this.getServer().getPlayer(bowOwnerId);
         if (owner != null) {
-            this.sendPriorityActionBar(
+            this.cooldowns.sendPriorityActionBar(
                     owner,
                     Component.text("Душа похищена! Душ: " + this.getSouls(bowOwnerId) + "/5", NamedTextColor.DARK_PURPLE));
         }
@@ -2165,9 +2045,6 @@ public class FokendLegendaryWepons extends JavaPlugin {
         ThrownBoomerang(UUID owner, ItemStack item) {
             this(owner, item, UUID.randomUUID().toString());
         }
-    }
-
-    private static record HudCooldown(long durationMs, String name) {
     }
 
     static record LockState(boolean ai, boolean gravity, boolean invulnerable) {

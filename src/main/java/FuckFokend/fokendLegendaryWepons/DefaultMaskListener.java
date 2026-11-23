@@ -136,13 +136,13 @@ final class DefaultMaskListener implements Listener {
     }
 
     private void triggerHammer(Player p) {
-        if (this.plugin.onCooldown(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD)) {
-            long sec = this.plugin.cooldownRemaining(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(p, Component.text("Молот на перезарядке: " + sec + "с", NamedTextColor.RED));
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD);
+            this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Молот на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.setCooldown(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD, "Молот маски");
+        this.plugin.cooldowns.start(p, "mask_hammer", FokendLegendaryWepons.MASK_HAMMER_CD, "Молот маски");
         float yaw = p.getLocation().getYaw();
         final Location impactLoc = p.getLocation().add(this.plugin.flatDir(yaw).multiply(3));
         final World world = impactLoc.getWorld();
@@ -225,7 +225,7 @@ final class DefaultMaskListener implements Listener {
                             hits++;
                         }
                     }
-                    DefaultMaskListener.this.plugin.sendPriorityActionBar(
+                    DefaultMaskListener.this.plugin.cooldowns.sendPriorityActionBar(
                             owner, Component.text("Удар молота! Поражено целей: " + hits, NamedTextColor.GOLD));
                 }
             }
@@ -233,8 +233,8 @@ final class DefaultMaskListener implements Listener {
     }
 
     private void triggerThompson(Player p) {
-        if (this.plugin.onCooldown(p, "mask_tompson_shot", 250L)) return;
-        this.plugin.cooldowns.put(p.getUniqueId() + ":mask_tompson_shot", System.currentTimeMillis());
+        if (this.plugin.cooldowns.isOnCooldown(p, "mask_tompson_shot", 250L)) return;
+        this.plugin.cooldowns.startSilent(p, "mask_tompson_shot");
 
         Vector dir = p.getEyeLocation().getDirection();
         Vector side = this.plugin.sideVector(dir).multiply(0.3D);

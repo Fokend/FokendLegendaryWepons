@@ -48,14 +48,14 @@ final class IceSpearListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "ice_spear")) return;
 
         e.setCancelled(true);
-        if (this.plugin.onCooldown(p, "ice_spear", CD)) {
-            long sec = this.plugin.cooldownRemaining(p, "ice_spear", CD) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(
+        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear", CD)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "ice_spear", CD);
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Ледяное копьё на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.setCooldown(p, "ice_spear", CD, "Морозные пики");
+        this.plugin.cooldowns.start(p, "ice_spear", CD, "Морозные пики");
         Location center = p.getLocation();
         World world = p.getWorld();
         BoundingBox box = BoundingBox.of(center, RADIUS, 8.0D, RADIUS);
@@ -97,10 +97,10 @@ final class IceSpearListener implements Listener {
 
         LivingEntity victim = (LivingEntity) e.getEntity();
         if (this.plugin.lockStates.containsKey(victim.getUniqueId())) return;
-        if (this.plugin.onCooldown(p, "ice_spear_freeze", FREEZE_HIT_CD)) return;
+        if (this.plugin.cooldowns.isOnCooldown(p, "ice_spear_freeze", FREEZE_HIT_CD)) return;
         if (!this.plugin.lockEntity(victim, false)) return;
 
-        this.plugin.setCooldown(p, "ice_spear_freeze", FREEZE_HIT_CD, "Заморозка копья");
+        this.plugin.cooldowns.start(p, "ice_spear_freeze", FREEZE_HIT_CD, "Заморозка копья");
         final Location anchorLoc = victim.getLocation().clone();
         Location iceLoc = anchorLoc.clone();
         iceLoc.setYaw(0.0F);

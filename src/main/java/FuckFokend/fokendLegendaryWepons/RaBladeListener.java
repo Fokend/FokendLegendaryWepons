@@ -70,18 +70,18 @@ final class RaBladeListener implements Listener {
             } else {
                 this.plugin.tempEntities.remove(existingId);
             }
-            this.plugin.sendPriorityActionBar(p, Component.text("Манекен Ра отозван", NamedTextColor.YELLOW));
+            this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Манекен Ра отозван", NamedTextColor.YELLOW));
             return;
         }
 
-        if (this.plugin.onCooldown(p, "ra_blade_spawn", CD)) {
-            long sec = this.plugin.cooldownRemaining(p, "ra_blade_spawn", CD) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(
+        if (this.plugin.cooldowns.isOnCooldown(p, "ra_blade_spawn", CD)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "ra_blade_spawn", CD);
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Клинок Ра на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
-        this.plugin.setCooldown(p, "ra_blade_spawn", CD, "Призыв манекена Ра");
+        this.plugin.cooldowns.start(p, "ra_blade_spawn", CD, "Призыв манекена Ра");
         Vector forward = this.plugin.flatDir(p.getLocation().getYaw());
         Location eyeFrom = p.getLocation().add(0.0D, 1.0D, 0.0D);
         RayTraceResult wall = p.getWorld().rayTraceBlocks(eyeFrom, forward, 1.8D, FluidCollisionMode.NEVER, true);
@@ -125,7 +125,7 @@ final class RaBladeListener implements Listener {
 
         final UUID dollId = doll.getUniqueId();
         this.plugin.raDolls.put(ownerId, dollId);
-        this.plugin.sendPriorityActionBar(p, Component.text("Манекен Бога Ра призван на 45 сек!", NamedTextColor.GOLD));
+        this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Манекен Бога Ра призван на 45 сек!", NamedTextColor.GOLD));
         p.getWorld().playSound(spawnLoc, Sound.BLOCK_BEACON_ACTIVATE, 1.0F, 1.5F);
 
         new BukkitRunnable() {
@@ -147,7 +147,7 @@ final class RaBladeListener implements Listener {
 
                     Player owner = RaBladeListener.this.plugin.getServer().getPlayer(ownerId);
                     if (owner != null && owner.isOnline()) {
-                        RaBladeListener.this.plugin.sendPriorityActionBar(
+                        RaBladeListener.this.plugin.cooldowns.sendPriorityActionBar(
                                 owner, Component.text("Время действия манекена Ра истекло!", NamedTextColor.GRAY));
                     }
                 }
@@ -229,7 +229,7 @@ final class RaBladeListener implements Listener {
 
         Player notify = attacker != null ? attacker : owner;
         if (notify != null) {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     notify,
                     Component.text(
                             "☀ Гнев Ра: " + String.format(Locale.US, "%.1f", reflectedDmg) + " урона по " + hits + " целям!",

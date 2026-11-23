@@ -58,9 +58,9 @@ final class ChaosBoomerangListener implements Listener {
         if (!this.plugin.checkAndMarkTick(p, "chaos_boomerang")) return;
 
         e.setCancelled(true);
-        if (this.plugin.onCooldown(p, "chaos_boomerang", 8000L)) {
-            long sec = this.plugin.cooldownRemaining(p, "chaos_boomerang", 8000L) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(p, Component.text("Бумеранг на перезарядке: " + sec + "с", NamedTextColor.RED));
+        if (this.plugin.cooldowns.isOnCooldown(p, "chaos_boomerang", 8000L)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "chaos_boomerang", 8000L);
+            this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Бумеранг на перезарядке: " + sec + "с", NamedTextColor.RED));
             return;
         }
 
@@ -82,7 +82,7 @@ final class ChaosBoomerangListener implements Listener {
         }
 
         this.plugin.activeThrowSessions.add(sessionId);
-        this.plugin.setCooldown(p, "chaos_boomerang", 8000L, "Бумеранг хаоса");
+        this.plugin.cooldowns.start(p, "chaos_boomerang", 8000L, "Бумеранг хаоса");
 
         final Location startLoc = p.getEyeLocation().subtract(0.0D, 0.3D, 0.0D);
         final World world = p.getWorld();
@@ -154,7 +154,7 @@ final class ChaosBoomerangListener implements Listener {
                             ChaosBoomerangListener.this.plugin.giveOrDrop(owner, cleanItem);
                         }
                         owner.getWorld().playSound(owner.getLocation(), Sound.ITEM_ARMOR_EQUIP_GENERIC, 1.0F, 1.4F);
-                        ChaosBoomerangListener.this.plugin.sendPriorityActionBar(
+                        ChaosBoomerangListener.this.plugin.cooldowns.sendPriorityActionBar(
                                 owner, Component.text("Бумеранг пойман! Отскоков: " + this.bounces, NamedTextColor.GREEN));
                     } else if (owner != null && owner.isDead()) {
                         Location ownerDeathLoc = owner.getLocation();

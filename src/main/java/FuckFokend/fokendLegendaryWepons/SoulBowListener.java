@@ -53,7 +53,7 @@ final class SoulBowListener implements Listener {
         UUID id = p.getUniqueId();
         int curSouls = this.plugin.getSouls(id);
         if (curSouls <= 0) {
-            this.plugin.sendPriorityActionBar(p, Component.text("Нет душ для поглощения!", NamedTextColor.RED));
+            this.plugin.cooldowns.sendPriorityActionBar(p, Component.text("Нет душ для поглощения!", NamedTextColor.RED));
             return;
         }
 
@@ -81,7 +81,7 @@ final class SoulBowListener implements Listener {
         p.getWorld().spawnParticle(
                 Particle.SOUL, p.getLocation().add(0.0D, 1.0D, 0.0D), 30, 0.4D, 0.6D, 0.4D, 0.04D);
         p.getWorld().playSound(p.getLocation(), Sound.ITEM_TOTEM_USE, 0.7F, 1.5F);
-        this.plugin.sendPriorityActionBar(
+        this.plugin.cooldowns.sendPriorityActionBar(
                 p,
                 Component.text(
                         "Поглощена душа! +4 ❤ (осталось душ: " + (curSouls - 1) + "/5)",
@@ -114,13 +114,13 @@ final class SoulBowListener implements Listener {
         if (curSouls >= FokendLegendaryWepons.MAX_SOULS && e.getForce() >= 0.25F) {
             this.plugin.souls.put(id, curSouls - 1);
             this.plugin.saveSouls();
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p,
                     Component.text(
                             "Максимум душ! 1 душа сгорела при выстреле (" + (curSouls - 1) + "/5) • +" + power + "❤ урона",
                             NamedTextColor.DARK_PURPLE));
         } else {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p,
                     Component.text(
                             "Выстрел Лука Душ (" + curSouls + "/5) • +" + power + "❤ урона",

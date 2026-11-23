@@ -38,15 +38,15 @@ final class TimeClockListener implements Listener {
 
         LivingEntity target = (LivingEntity) e.getEntity();
         if (this.plugin.timeSessions.containsKey(p.getUniqueId())) {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Часы уже заняты. Верните время (ПКМ).", NamedTextColor.RED));
         } else if (this.plugin.timeByTarget.containsKey(target.getUniqueId())
                 || this.plugin.lockStates.containsKey(target.getUniqueId())) {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Эта цель уже остановлена.", NamedTextColor.RED));
-        } else if (this.plugin.onCooldown(p, "time_clock", 180000L)) {
-            long sec = this.plugin.cooldownRemaining(p, "time_clock", 180000L) / 1000L + 1L;
-            this.plugin.sendPriorityActionBar(
+        } else if (this.plugin.cooldowns.isOnCooldown(p, "time_clock", 180000L)) {
+            long sec = this.plugin.cooldowns.remainingSeconds(p, "time_clock", 180000L);
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Часы на перезарядке: " + sec + "с", NamedTextColor.RED));
         } else {
             this.plugin.startTimeSession(p, target);
@@ -66,10 +66,10 @@ final class TimeClockListener implements Listener {
         e.setCancelled(true);
         FokendLegendaryWepons.TimeSession session = this.plugin.timeSessions.get(p.getUniqueId());
         if (session == null) {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("ЛКМ по сущности, чтобы остановить её во времени.", NamedTextColor.GRAY));
         } else if (!session.frozen) {
-            this.plugin.sendPriorityActionBar(
+            this.plugin.cooldowns.sendPriorityActionBar(
                     p, Component.text("Идёт запись движений цели...", NamedTextColor.YELLOW));
         } else {
             int frameNum = session.index + 1;

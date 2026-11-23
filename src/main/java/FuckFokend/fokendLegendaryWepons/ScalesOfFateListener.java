@@ -192,13 +192,13 @@ final class ScalesOfFateListener implements Listener {
    }
 
    private void highJudgement(Player p) {
-      if (!this.plugin.onCooldown(p, "fate_judgement", 20000L)) {
+      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_judgement", 20000L)) {
          RayTraceResult r = p.getWorld().rayTraceEntities(p.getEyeLocation(), p.getEyeLocation().getDirection(), (double)20.0F, 0.6, (en) -> this.plugin.isTargetable(en, p));
          if (r != null) {
             Entity var4 = r.getHitEntity();
             if (var4 instanceof LivingEntity) {
                LivingEntity target = (LivingEntity)var4;
-               this.plugin.setCooldown(p, "fate_judgement", 20000L, "Верховный Суд");
+               this.plugin.cooldowns.start(p, "fate_judgement", 20000L, "Верховный Суд");
                this.weighEffect(p);
                boolean left = coin();
                if (left) {
@@ -228,8 +228,8 @@ final class ScalesOfFateListener implements Listener {
    }
 
    private void goodFate(Player p) {
-      if (!this.plugin.onCooldown(p, "fate_good", 25000L)) {
-         this.plugin.setCooldown(p, "fate_good", 25000L, "Хорошая судьба");
+      if (!this.plugin.cooldowns.isOnCooldown(p, "fate_good", 25000L)) {
+         this.plugin.cooldowns.start(p, "fate_good", 25000L, "Хорошая судьба");
          this.weighEffect(p);
          boolean left = coin();
          if (left) {
@@ -309,11 +309,11 @@ final class ScalesOfFateListener implements Listener {
                         }
                      }
 
-                     if (this.plugin.onCooldown(p, "fate_bad", 15000L)) {
+                     if (this.plugin.cooldowns.isOnCooldown(p, "fate_bad", 15000L)) {
                         return;
                      }
 
-                     this.plugin.setCooldown(p, "fate_bad", 15000L, "Плохая судьба");
+                     this.plugin.cooldowns.start(p, "fate_bad", 15000L, "Плохая судьба");
                      this.weighEffect(p);
                      if (coin()) {
                         ThreadLocalRandom rnd = ThreadLocalRandom.current();
