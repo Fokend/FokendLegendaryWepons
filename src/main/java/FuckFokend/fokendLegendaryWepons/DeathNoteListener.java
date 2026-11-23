@@ -435,7 +435,8 @@ final class DeathNoteListener implements Listener {
             mob.getWorld().playSound(mob.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.5F, 1.7F);
             try {
                 mob.setHealth(0.0D);
-            } catch (Exception ignored) {
+            } catch (RuntimeException ex) {
+                this.plugin.warnOnce("Death Note: setHealth(0) on " + mob.getType(), ex);
                 mob.damage(999999.0D);
             }
             if (owner != null && owner.isOnline()) {

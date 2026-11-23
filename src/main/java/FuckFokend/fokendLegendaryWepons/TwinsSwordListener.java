@@ -209,7 +209,8 @@ final class TwinsSwordListener implements Listener {
 
                             try {
                                 npc.setPose(sneaking ? Pose.SNEAKING : Pose.STANDING, sneaking);
-                            } catch (Exception ignored) {
+                            } catch (RuntimeException ex) {
+                                TwinsSwordListener.this.plugin.warnOnce("Twins Sword: copying the owner's pose", ex);
                             }
 
                             if (this.tick % 10 == 0 && npc.getEquipment() != null) {

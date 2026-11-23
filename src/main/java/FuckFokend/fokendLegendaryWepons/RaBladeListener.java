@@ -110,7 +110,8 @@ final class RaBladeListener implements Listener {
                     EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
                 try {
                     as.addEquipmentLock(slot, LockType.REMOVING_OR_CHANGING);
-                } catch (Exception ignored) {
+                } catch (RuntimeException ex) {
+                    this.plugin.warnOnce("Ra Blade: equipment lock on " + slot, ex);
                 }
             }
 
@@ -192,7 +193,8 @@ final class RaBladeListener implements Listener {
         UUID ownerId;
         try {
             ownerId = UUID.fromString(victim.getMetadata(FokendLegendaryWepons.META_RA_DOLL).get(0).asString());
-        } catch (Exception ex) {
+        } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
+            this.plugin.getLogger().warning("Ra doll " + victim.getUniqueId() + " has no valid owner metadata");
             return;
         }
 

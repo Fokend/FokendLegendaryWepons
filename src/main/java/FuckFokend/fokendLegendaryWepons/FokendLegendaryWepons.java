@@ -141,6 +141,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Map<UUID, UUID> raDolls = new ConcurrentHashMap<>();
     final Map<UUID, List<UUID>> activeTwins = new ConcurrentHashMap<>();
     final CooldownManager cooldowns = new CooldownManager(this);
+    private final Set<String> reportedFailures = ConcurrentHashMap.newKeySet();
     final Map<UUID, Long> maskSneakStart = new ConcurrentHashMap<>();
     final Map<UUID, Long> maskRunUntil = new ConcurrentHashMap<>();
     final Set<UUID> hovering = ConcurrentHashMap.newKeySet();
@@ -584,6 +585,17 @@ public class FokendLegendaryWepons extends JavaPlugin {
             }
         }
         return false;
+    }
+
+    /**
+     * Logs a failure with its stack trace the first time it happens at {@code where}.
+     * Used for best-effort calls inside per-tick tasks, where logging every failure would flood the console.
+     */
+    void warnOnce(String where, Throwable t) {
+        if (this.reportedFailures.add(where)) {
+            this.getLogger().log(java.util.logging.Level.WARNING,
+                    where + " failed; later failures here are not logged", t);
+        }
     }
 
     boolean isCraftingCore(String id) {

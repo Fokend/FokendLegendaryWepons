@@ -106,7 +106,7 @@ final class WardenHelmetListener implements Listener {
 
                         for (Entity ent : p.getWorld().getNearbyEntities(p.getLocation(), 32.0D, 32.0D, 32.0D)) {
                             if (ent instanceof Warden warden) {
-                                WardenHelmetListener.pacifyWarden(warden, p);
+                                WardenHelmetListener.pacifyWarden(plugin, warden, p);
                             }
                         }
                     } else if (plugin.wardenBlindness.remove(id)) {
@@ -117,73 +117,50 @@ final class WardenHelmetListener implements Listener {
         }.runTaskTimer(plugin, 1L, 2L);
     }
 
-    static void pacifyWarden(Warden warden, Player wearer) {
+    static void pacifyWarden(FokendLegendaryWepons plugin, Warden warden, Player wearer) {
         if (warden == null || wearer == null) return;
 
-        boolean targetedWearer = false;
-        try {
-            if (wearer.equals(warden.getTarget()) || wearer.equals(warden.getEntityAngryAt())) {
-                targetedWearer = true;
-            }
-        } catch (Throwable ignored) {
+        boolean targetedWearer = wearer.equals(warden.getTarget()) || wearer.equals(warden.getEntityAngryAt());
+
+        UUID angryAtMem = warden.getMemory(MemoryKey.ANGRY_AT);
+        if (wearer.getUniqueId().equals(angryAtMem)) {
+            targetedWearer = true;
+            warden.setMemory(MemoryKey.ANGRY_AT, null);
         }
 
-        try {
-            UUID angryAtMem = warden.getMemory(MemoryKey.ANGRY_AT);
-            if (wearer.getUniqueId().equals(angryAtMem)) {
-                targetedWearer = true;
-                warden.setMemory(MemoryKey.ANGRY_AT, null);
-            }
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            if (warden.getAnger(wearer) > 0) {
-                warden.clearAnger(wearer);
-                warden.setAnger(wearer, 0);
-            }
-        } catch (Throwable ignored) {
-            try {
-                warden.clearAnger(wearer);
-            } catch (Throwable ignored2) {
-            }
+        if (warden.getAnger(wearer) > 0) {
+            warden.clearAnger(wearer);
+            warden.setAnger(wearer, 0);
         }
 
         if (!targetedWearer) {
             return;
         }
 
-        try {
-            warden.setTarget(null);
-        } catch (Throwable ignored) {
-        }
+        warden.setTarget(null);
 
+        // The Bukkit API cannot clear the warden's brain memories, so this reaches into the server
+        // internals by reflection. It breaks when Mojang renames things; then the warden calms down a
+        // little later than it should, which is why a failure is logged once and otherwise ignored.
         try {
             Method getHandle = warden.getClass().getMethod("getHandle");
             Object handle = getHandle.invoke(warden);
-            if (handle != null) {
-                Method getBrain = handle.getClass().getMethod("getBrain");
-                Object brain = getBrain.invoke(handle);
-                if (brain != null) {
-                    Class<?> memTypeClass = Class.forName("net.minecraft.world.entity.ai.memory.MemoryModuleType");
-                    Method eraseMemory = brain.getClass().getMethod("eraseMemory", memTypeClass);
-                    for (String fieldName : new String[]{"ATTACK_TARGET", "ROAR_TARGET", "ANGRY_AT", "DISTURBANCE_LOCATION"}) {
-                        try {
-                            Field field = memTypeClass.getField(fieldName);
-                            Object memModule = field.get(null);
-                            eraseMemory.invoke(brain, memModule);
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }
-                try {
-                    Class<?> wardenAiClass = Class.forName("net.minecraft.world.entity.monster.warden.WardenAi");
-                    Method updateActivity = wardenAiClass.getMethod("updateActivity", handle.getClass());
-                    updateActivity.invoke(null, handle);
-                } catch (Throwable ignored) {
+            if (handle == null) return;
+            Method getBrain = handle.getClass().getMethod("getBrain");
+            Object brain = getBrain.invoke(handle);
+            if (brain != null) {
+                Class<?> memTypeClass = Class.forName("net.minecraft.world.entity.ai.memory.MemoryModuleType");
+                Method eraseMemory = brain.getClass().getMethod("eraseMemory", memTypeClass);
+                for (String fieldName : new String[]{"ATTACK_TARGET", "ROAR_TARGET", "ANGRY_AT", "DISTURBANCE_LOCATION"}) {
+                    Field field = memTypeClass.getField(fieldName);
+                    eraseMemory.invoke(brain, field.get(null));
                 }
             }
-        } catch (Throwable ignored) {
+            Class<?> wardenAiClass = Class.forName("net.minecraft.world.entity.monster.warden.WardenAi");
+            Method updateActivity = wardenAiClass.getMethod("updateActivity", handle.getClass());
+            updateActivity.invoke(null, handle);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
+            plugin.warnOnce("Warden Helmet: clearing warden brain memories", ex);
         }
     }
 
@@ -256,7 +233,7 @@ final class WardenHelmetListener implements Listener {
                 && this.plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET)) {
             e.setNewAnger(0);
             e.setCancelled(true);
-            pacifyWarden(e.getEntity(), p);
+            pacifyWarden(this.plugin, e.getEntity(), p);
         }
     }
 
@@ -266,7 +243,7 @@ final class WardenHelmetListener implements Listener {
                 && e.getTarget() instanceof Player p
                 && this.plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET)) {
             e.setCancelled(true);
-            pacifyWarden(warden, p);
+            pacifyWarden(this.plugin, warden, p);
         }
     }
 
@@ -276,7 +253,7 @@ final class WardenHelmetListener implements Listener {
                 && e.getEntity() instanceof Player p
                 && this.plugin.isLegendary(p.getInventory().getHelmet(), FokendLegendaryWepons.ID_WARDEN_HELMET)) {
             e.setCancelled(true);
-            pacifyWarden(warden, p);
+            pacifyWarden(this.plugin, warden, p);
         }
     }
 
