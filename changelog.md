@@ -1,5 +1,14 @@
 # Development Build changelog
 
+## Unreleased
+
+- Balance numbers moved to `plugins/FokendLegendaryWepons/config.yml`: ability cooldowns, core upgrade chances, Chaos Boomerang, Ice Spear and Twins Sword damage, Ra doll lifetime, max souls, revive health, Default Mask run timings, Scales of Fate judgement and lightning, Death Note radius.
+  Edit the file and run `/legendary reload` (also works from the console); a restart is not needed. A value that is not a number is logged and replaced by the default.
+  Item lore still shows the original numbers.
+- Old legendary items are moved to the current id key when a player joins or opens a container.
+- The plugin no longer disables the old LegendaryWeapons plugin; it logs a warning asking to remove it.
+- Errors in ability code are logged once instead of being silently ignored.
+
 ## 1.3.4 — 2026-11-19
 
 - Kill switch for legendary abilities: `/legendary disable <name>`, `/legendary enable <name>`, `/legendary disabled`.

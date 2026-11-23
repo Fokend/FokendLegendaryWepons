@@ -1,6 +1,6 @@
 name: FokendLegendaryWepons
 version: '${version}'
-main: FuckFokend.fokendLegendaryWepons.FokendLegendaryWepons
+main: fokend.legendaryweapons.FokendLegendaryWepons
 api-version: '1.21.11'
 authors: [ Fokend ]
 description: Легендарное оружие и ядра SMP

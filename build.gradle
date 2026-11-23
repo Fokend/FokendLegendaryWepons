@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group = 'FuckFokend'
+group = 'fokend'
 version = '1.3.4'
 
 repositories {
