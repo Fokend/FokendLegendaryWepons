@@ -145,6 +145,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
     final Map<UUID, Integer> lastThompsonHitTick = new ConcurrentHashMap<>();
 
     File soulFile;
+    /** Legend Chronicle + Legend Call; null when disabled or when its database could not be opened. */
+    Chronicle chronicle;
+    DeathNoteListener deathNote;
     /** The one key that marks an item as a legendary; its value is the legendary id. */
     NamespacedKey weaponKey;
     /** Older builds also wrote the id here. Read only to migrate old items, see {@link #migrateLegacyId}. */
@@ -204,7 +207,8 @@ public class FokendLegendaryWepons extends JavaPlugin {
         pm.registerEvents(new CoreUpgradeListener(this), this);
         pm.registerEvents(new ItemProtectionListener(this), this);
         pm.registerEvents(new EntityRightClickBridge(this), this);
-        pm.registerEvents(new DeathNoteListener(this), this);
+        this.deathNote = new DeathNoteListener(this);
+        pm.registerEvents(this.deathNote, this);
         pm.registerEvents(new ScalesOfFateListener(this), this);
         pm.registerEvents(new LegacyItemMigrationListener(this), this);
 
@@ -240,6 +244,7 @@ public class FokendLegendaryWepons extends JavaPlugin {
 
         this.recipes.registerRecipes();
         this.recipes.logRecipes();
+        this.chronicle = Chronicle.start(this);
         this.getLogger().info("FokendLegendaryWepons " + this.getPluginMeta().getVersion()
                 + ": 10 легендарок (Клинок Ра, Бумеранг Хаоса, Шлем Вардена, Меч Близнецов, Магнитник,"
                 + " Часы, Морозное копьё, Маска, Томпсон, Лук Душ) + Тетрадь Смерти, Весы Судьбы, 3 ядра.");
@@ -471,6 +476,11 @@ public class FokendLegendaryWepons extends JavaPlugin {
         this.maskSneakStart.clear();
         this.maskRunUntil.clear();
         this.saveSouls();
+        // Last: everything above may still move legendaries (boomerangs returned, items dropped).
+        if (this.chronicle != null) {
+            this.chronicle.close();
+            this.chronicle = null;
+        }
     }
 
     ItemStack cleanBoomerangItem(ItemStack item) {
@@ -519,6 +529,9 @@ public class FokendLegendaryWepons extends JavaPlugin {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
             pdc.remove(this.weaponKey);
             pdc.remove(this.legacyIdKey);
+            // Display copies must not carry the chronicle instance either.
+            pdc.remove(new NamespacedKey(this, "legend_uid"));
+            pdc.remove(new NamespacedKey(this, "legend_gen"));
             if (this.throwSessionKey != null) pdc.remove(this.throwSessionKey);
             copy.setItemMeta(meta);
         }

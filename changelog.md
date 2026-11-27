@@ -1,6 +1,19 @@
 # Development Build changelog
 
-## Unreleased
+## 1.4.0 — 2026-11-27
+
+- **Legend Chronicle** (`/legends`). Every legendary (Ra, Boomerang, Twins, Warden Helmet, Magnet, Clock, Ice Spear, Chaos Mask, Soul Bow, Death Note, Scales of Fate) gets a permanent instance id. The chronicle keeps the current owner, since when, and every change of hands with its reason: crafted, given by an admin, kill, looted from a fallen player, handed over, taken from storage, Death Note refusal, found by Legend Call. Stored in SQLite (`plugins/FokendLegendaryWepons/chronicle.db`), survives restarts.
+  - GUI: overview of all legendaries, click for a paged history. Admins also see places, ids and flags.
+  - The Death Note's owner is never shown to players (it would break `/check`).
+  - Chests and ender chests do not change the owner. Graves (AxGraves) are supported: the death is recorded before the grave plugin takes the items, and whoever takes the item out later is recorded as the killer or a looter, even after a restart.
+  - Copies are never deleted. An item that is a stale, retired, unknown or duplicate copy is taken out of play and kept in quarantine with all its data: `/legends review`, `/legends approve <id> [player]`, `/legends discard <id>`. Only verified duplicates are taken out; a move that cannot be verified (the other holder is offline) is only reported to admins.
+  - A transfer between two accounts with the same IP is flagged for admins (not blocked).
+  - Legendaries can no longer be put into shulker boxes or bundles. Ones already inside are still tracked.
+  - Mobs can no longer pick up legendaries.
+- **Legend Call.** If an owner has not been on for 72 hours (or played under 15 minutes in that time), their legendary calls for a new owner: an announcement with a point within ±200 blocks (fixed per call, so repeats do not narrow it down), repeated every 6 hours, at most 4 times. An item in an offline player's inventory or ender chest is released into the world where it was last seen; their copy becomes stale. The owner coming back before an item in the world is found cancels the call. Settings: `chronicle.call` in `config.yml`.
+- `/legendary give` of a legendary that already has a live instance asks for `/legendary confirm`; the old instance is retired. Legendaries are given one at a time.
+- Crafting a legendary is refused while a live instance of it exists (also after `/legendary resetcrafts`).
+- Admin: `/legends info <type>`, `/legends call <type>`, `/legends retire <type> confirm`.
 
 - Balance numbers moved to `plugins/FokendLegendaryWepons/config.yml`: ability cooldowns, core upgrade chances, Chaos Boomerang, Ice Spear and Twins Sword damage, Ra doll lifetime, max souls, revive health, Default Mask run timings, Scales of Fate judgement and lightning, Death Note radius.
   Edit the file and run `/legendary reload` (also works from the console); a restart is not needed. A value that is not a number is logged and replaced by the default.

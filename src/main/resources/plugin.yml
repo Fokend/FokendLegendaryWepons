@@ -8,7 +8,7 @@ description: Легендарное оружие и ядра SMP
 commands:
   legendary:
     description: Выдача легендарного оружия и управление состояниями
-    usage: /legendary <id|give|fix|clearsouls|resetcrafts|disable|enable|disabled>
+    usage: /legendary <id|give|confirm|fix|clearsouls|resetcrafts|disable|enable|disabled>
     permission: legendary.admin
   revive:
     description: Возродить игрока и очистить бездушие за 5 сердец
@@ -23,12 +23,19 @@ commands:
   check:
     description: Тетрадь Смерти - угадать владельца
     usage: /check <ник>
+  legends:
+    description: Летопись легенд - кто владеет каждой легендаркой и её история
+    usage: /legends [review|approve|discard|info|call|retire]
+    permission: legends.use
   dnunlock:
     description: Снять вечный режим приключений
     usage: /dnunlock <ник>
     permission: legendary.admin
 
 permissions:
+  legends.use:
+    description: Открывать /legends
+    default: true
   legendary.admin:
     description: Доступ к командам /legendary и /dnunlock
     default: op

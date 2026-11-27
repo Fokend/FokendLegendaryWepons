@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'fokend'
-version = '1.3.4'
+version = '1.4.0'
 
 repositories {
     mavenCentral()
@@ -18,6 +18,8 @@ dependencies {
 
     testImplementation 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT'
     testImplementation 'org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.116.3'
+    // Paper ships this driver on the server classpath; tests need it on theirs.
+    testImplementation 'org.xerial:sqlite-jdbc:3.49.1.0'
     testImplementation platform('org.junit:junit-bom:6.0.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

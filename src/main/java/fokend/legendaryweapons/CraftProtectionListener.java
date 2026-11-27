@@ -67,7 +67,17 @@ final class CraftProtectionListener implements Listener {
             e.getWhoClicked().sendMessage(Component.text("Этот легендарный предмет уже был создан на сервере!", NamedTextColor.RED));
             return;
         }
+        if (plugin.chronicle != null && !plugin.chronicle.registry.canCreate(resId)) {
+            // resetcrafts reopened the recipe, but the old instance is still alive: one per server.
+            e.setCancelled(true);
+            e.getWhoClicked().sendMessage(Component.text("Эта легендарка уже существует — так говорит Летопись (/legends).", NamedTextColor.RED));
+            return;
+        }
         plugin.craftedUniques.add(resId);
+        if (plugin.chronicle != null && e.getWhoClicked() instanceof Player crafter) {
+            plugin.chronicle.registry.expectCraft(resId, crafter.getUniqueId());
+            plugin.chronicle.tracker.markDirty(crafter);
+        }
         if (e.getRecipe() instanceof Keyed keyed) {
             plugin.craftedUniques.add(keyed.getKey().getKey());
             for (Player online : plugin.getServer().getOnlinePlayers()) {

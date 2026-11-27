@@ -59,3 +59,17 @@ scales_of_fate:
 
 death_note:
   kill_radius: 30.0
+
+# Летопись легенд (/legends) и Зов легенды.
+chronicle:
+  enabled: true                # false — без Летописи и Зова (нужен перезапуск)
+  scan_interval_seconds: 5     # страховочная проверка инвентарей онлайн-игроков
+  timezone: "Asia/Almaty"      # для дат в /legends
+  call:
+    enabled: true
+    inactive_hours: 72         # сколько хозяин должен отсутствовать
+    min_active_minutes: 15     # меньше этого онлайна за окно — тоже «нет» (против заходов твинком на минуту)
+    radius: 200                # погрешность координат в объявлении, блоков
+    check_interval_minutes: 10
+    repeat_hours: 6            # повтор объявления
+    max_announcements: 4

@@ -282,6 +282,9 @@ final class DeathNoteListener implements Listener {
             if (note == null) {
                 return true;
             }
+            if (this.plugin.chronicle != null) {
+                this.plugin.chronicle.registry.markRefused(note, p.getUniqueId());
+            }
             Player nearest = null;
             double best = Double.MAX_VALUE;
             for (Player o : p.getWorld().getPlayers()) {
@@ -305,12 +308,22 @@ final class DeathNoteListener implements Listener {
                 this.owners.add(nearest.getUniqueId());
                 this.save();
                 this.plugin.giveOrDrop(nearest, note);
+                if (this.plugin.chronicle != null) {
+                    this.plugin.chronicle.tracker.markDirty(nearest);
+                }
                 nearest.sendMessage(Component.text("Тетрадь Смерти перешла к тебе. Прочитай правила на последних страницах.", NamedTextColor.DARK_RED));
             }
             return true;
         } else {
             sender.sendMessage("Только для игроков.");
             return true;
+        }
+    }
+
+    /** Legend Call took the note away from an inactive owner: they are no longer its (secret) owner. */
+    void forgetOwner(UUID id) {
+        if (this.owners.contains(id)) {
+            this.releaseOwner(id);
         }
     }
 

@@ -28,8 +28,14 @@ final class LegendaryCommand implements CommandExecutor, TabCompleter {
             "ice_spear_ice", "ice_spear_spike", "default_mask", "happy_mask",
             "mask_block", "mask_mace", "mask_tompson", "soul_bow",
             "death_note", "fate_scales", "fate_lightning",
-            "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled", "reload"
+            "fix", "clearsouls", "resetcrafts", "disable", "enable", "disabled", "reload", "confirm"
     );
+
+    /** A give that would replace a live chronicled legendary, waiting for /legendary confirm. */
+    private record PendingGive(String type, UUID target, ItemStack item, UUID replacedUid, long expiresAt) {
+    }
+
+    private final Map<UUID, PendingGive> pendingGives = new java.util.HashMap<>();
 
     LegendaryCommand(FokendLegendaryWepons plugin) {
         this.plugin = plugin;
@@ -55,6 +61,10 @@ final class LegendaryCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("confirm")) {
+            this.confirmGive(p);
+            return true;
+        }
         if (sub.equals("fix")) {
             UUID id = p.getUniqueId();
             TimeClockSessions.TimeSession sOwner = this.plugin.timeClock.timeSessions.get(id);
@@ -200,10 +210,66 @@ final class LegendaryCommand implements CommandExecutor, TabCompleter {
             p.sendMessage("Неизвестный ID. Доступно: " + String.join(", ", this.IDS));
             return true;
         }
+        String givenType = this.plugin.getId(item);
+        if (this.plugin.chronicle != null && LegendRegistry.CHRONICLED.contains(givenType)) {
+            // One live instance per server: never more than one, and replacing needs an explicit confirmation.
+            this.giveChronicled(p, targetPlayer, item, givenType);
+            return true;
+        }
         for (int i = 0; i < amount; i++) {
             this.plugin.giveOrDrop(targetPlayer, item.clone());
         }
         return true;
+    }
+
+    private void giveChronicled(Player admin, Player target, ItemStack item, String type) {
+        LegendRegistry reg = this.plugin.chronicle.registry;
+        LegendRecord live = reg.live(type);
+        if (live == null) {
+            this.handOut(admin, target, item);
+            return;
+        }
+        this.pendingGives.put(admin.getUniqueId(), new PendingGive(type, target.getUniqueId(), item.clone(), live.uid,
+                System.currentTimeMillis() + 30_000L));
+        admin.sendMessage(Component.text("⚠ У «" + reg.typeTitle(type) + "» уже есть живой экземпляр: хозяин "
+                + reg.name(live.owner) + ", сейчас " + LegendsMenu.status(live) + ".", NamedTextColor.GOLD));
+        admin.sendMessage(Component.text("Новый погасит старый: старая копия при обнаружении уйдёт на проверку (не удаляется). "
+                + "Подтверди в течение 30 с: ", NamedTextColor.GOLD)
+                .append(Component.text("[/legendary confirm]", NamedTextColor.GREEN)
+                        .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand("/legendary confirm"))));
+    }
+
+    private void confirmGive(Player admin) {
+        PendingGive pending = this.pendingGives.remove(admin.getUniqueId());
+        if (pending == null || pending.expiresAt() < System.currentTimeMillis()) {
+            admin.sendMessage(Component.text("Нечего подтверждать (или прошло больше 30 с). Повтори /legendary give.", NamedTextColor.RED));
+            return;
+        }
+        if (this.plugin.chronicle == null) {
+            admin.sendMessage(Component.text("Летопись не работает — выдача отменена.", NamedTextColor.RED));
+            return;
+        }
+        Player target = this.plugin.getServer().getPlayer(pending.target());
+        if (target == null) {
+            admin.sendMessage(Component.text("Игрок вышел — выдача отменена.", NamedTextColor.RED));
+            return;
+        }
+        LegendRecord live = this.plugin.chronicle.registry.live(pending.type());
+        if (live != null && !live.uid.equals(pending.replacedUid())) {
+            // Something else changed in the meantime: ask again about what is live now.
+            this.giveChronicled(admin, target, pending.item(), pending.type());
+            return;
+        }
+        this.plugin.getLogger().warning(admin.getName() + " подтвердил замену " + pending.type()
+                + " (старый экземпляр " + pending.replacedUid() + " погашен)");
+        this.handOut(admin, target, pending.item());
+    }
+
+    private void handOut(Player admin, Player target, ItemStack item) {
+        ItemStack stamped = this.plugin.chronicle.registry.registerGiven(item.clone(), target, admin.getUniqueId());
+        this.plugin.giveOrDrop(target, stamped);
+        this.plugin.chronicle.tracker.markDirty(target);
+        admin.sendMessage(Component.text("Выдано и записано в Летопись.", NamedTextColor.GREEN));
     }
 
     @Override
